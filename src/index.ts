@@ -47,12 +47,9 @@ export function parse<Result = void>(
       typeof yielded !== 'string' && (yielded as any)[Symbol.iterator]
         ? (yielded as Iterable<ParseItem>)
         : [yielded];
-    console.log('choices', choices, yielded, (yielded as any)[Symbol.iterator]);
 
     for (const choice of choices) {
-      console.log("CHOICE", choice);
       if (typeof choice === 'string') {
-        console.log('possible choice', choice);
         let found = false;
         const newInput = input.replace(choice, (_1, offset: number) => {
           found = offset === 0;
@@ -62,8 +59,6 @@ export function parse<Result = void>(
           input = newInput;
           lastResult = choice;
           continue main;
-        } else {
-          console.log('bad choice', choice);
         }
       } else if (choice instanceof RegExp) {
         const match = input.match(choice);
@@ -74,9 +69,7 @@ export function parse<Result = void>(
           continue main;
         }
       } else if (choice instanceof Function) {
-        console.log("IS GEN", choice);
         const choiceResult = parse(input, choice());
-        console.log("RESULT", choiceResult);
         if (choiceResult.success) {
           lastResult = choiceResult.result as any;
           input = choiceResult.remaining;
