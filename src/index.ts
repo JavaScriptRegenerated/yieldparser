@@ -1,50 +1,93 @@
-export type ParseItem = string | RegExp;
+export type ParseItem = string | Iterable<string> | RegExp;
 
-type ParseResult<Result = void> = {
-  success: false;
-  remaining: string;
-} | {
-  success: true;
-  remaining: string;
-  result: Result;
-}
+export type ParseResult<Result> =
+  | {
+      success: false;
+      remaining: string;
+    }
+  | {
+      success: true;
+      remaining: string;
+      result: Result;
+    };
 
-export function parse(input: string, generator: Generator<ParseItem>): ParseResult {
-  let lastResult: string | undefined = undefined;
-  while (true) {
-    const { value: item, done } = generator.next(lastResult);
-    if (done) {
+export type ParseYieldedValue<Input extends ParseItem> = Input extends RegExp
+  ? RegExpMatchArray
+  : string;
+
+export type ParseGenerator<Result = unknown> =
+  | Generator<
+      string | Iterable<string> | RegExp,
+      Result,
+      string | RegExpMatchArray
+    >
+  | Generator<unknown, Result, undefined>
+  | Iterable<ParseItem>;
+
+export function parse<Result = void>(
+  input: string,
+  iterable: ParseGenerator<Result>
+): ParseResult<Result> {
+  let lastResult: ParseYieldedValue<ParseItem> | undefined;
+
+  const iterator = iterable[Symbol.iterator]();
+
+  main: while (true) {
+    const next = iterator.next(lastResult as any);
+    if (next.done) {
       return {
         success: true,
         remaining: input,
-        result: item,
+        result: next.value,
       };
     }
-  
-    if (typeof item === 'string') {
-      if (input.startsWith(item)) {
-        input = input.replace(item, '');
-        lastResult = item;
-        continue;
-      } else {
-        return {
-          success: false,
-          remaining: input
-        };
-      }
-    } else if (item instanceof RegExp) {
-      console.log('regex', item, input, input.match(item));
-      const match = input.match(item);
-      if (match) {
-        lastResult = match[0];
-        input = input.replace(item, '');
-        continue;
-      } else {
-        return {
-          success: false,
-          remaining: input
-        };
+
+    const yielded = next.value as ParseItem;
+    const choices =
+      typeof yielded !== 'string' && (yielded as any)[Symbol.iterator]
+        ? (yielded as Iterable<ParseItem>)
+        : [yielded];
+    console.log('choices', choices, yielded, (yielded as any)[Symbol.iterator]);
+
+    for (const choice of choices) {
+      console.log("CHOICE", choice);
+      if (typeof choice === 'string') {
+        console.log('possible choice', choice);
+        let found = false;
+        const newInput = input.replace(choice, (_1, offset: number) => {
+          found = offset === 0;
+          return '';
+        });
+        if (found) {
+          input = newInput;
+          lastResult = choice;
+          continue main;
+        } else {
+          console.log('bad choice', choice);
+        }
+      } else if (choice instanceof RegExp) {
+        const match = input.match(choice);
+        if (match) {
+          lastResult = match;
+          // input = input.replace(item, '');
+          input = input.slice(match[0].length);
+          continue main;
+        }
+      } else if (choice instanceof Function) {
+        console.log("IS GEN", choice);
+        const choiceResult = parse(input, choice());
+        console.log("RESULT", choiceResult);
+        if (choiceResult.success) {
+          lastResult = choiceResult.result as any;
+          input = choiceResult.remaining;
+          continue main;
+        }
       }
     }
+
+    return {
+      success: false,
+      remaining: input,
+    };
   }
 }
