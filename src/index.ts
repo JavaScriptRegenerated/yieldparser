@@ -1,9 +1,16 @@
 export type ParseItem = string | Iterable<string> | RegExp;
 
+export interface ParseError {
+  iterationCount: number;
+  yielded: ParseItem;
+  nested?: Array<ParseError>;
+}
+
 export type ParseResult<Result> =
   | {
       success: false;
       remaining: string;
+      failedOn: ParseError;
     }
   | {
       success: true;
@@ -30,9 +37,13 @@ export function parse<Result = void>(
 ): ParseResult<Result> {
   let lastResult: ParseYieldedValue<ParseItem> | undefined;
 
+  let iterationCount = -1;
   const iterator = iterable[Symbol.iterator]();
 
   main: while (true) {
+    const nestedErrors: Array<ParseError> = [];
+
+    iterationCount += 1;
     const next = iterator.next(lastResult as any);
     if (next.done) {
       return {
@@ -74,6 +85,8 @@ export function parse<Result = void>(
           lastResult = choiceResult.result as any;
           input = choiceResult.remaining;
           continue main;
+        } else if (choiceResult.failedOn) {
+          nestedErrors.push(choiceResult.failedOn);
         }
       }
     }
@@ -81,6 +94,16 @@ export function parse<Result = void>(
     return {
       success: false,
       remaining: input,
+      failedOn: {
+        iterationCount,
+        yielded,
+        nested: nestedErrors.length === 0 ? undefined : nestedErrors,
+      },
     };
   }
+}
+
+export function* isEnd() {
+  const { index }: { index: number } = yield /$/;
+  return index === 0;
 }

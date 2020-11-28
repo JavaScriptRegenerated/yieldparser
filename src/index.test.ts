@@ -1,4 +1,4 @@
-import { parse } from './index';
+import { parse, isEnd } from './index';
 
 describe('parse()', () => {
   describe('failing', () => {
@@ -6,6 +6,7 @@ describe('parse()', () => {
       expect(parse('abcdef', ['abc', 'wrong'])).toEqual({
         remaining: 'def',
         success: false,
+        failedOn: { iterationCount: 1, yielded: 'wrong' },
       });
     });
 
@@ -17,7 +18,11 @@ describe('parse()', () => {
             yield 'bc';
           })()
         )
-      ).toEqual({ success: false, remaining: 'abc' });
+      ).toEqual({
+        success: false,
+        remaining: 'abc',
+        failedOn: { iterationCount: 0, yielded: 'bc' },
+      });
     });
 
     test('yielding wrong string', () => {
@@ -29,7 +34,11 @@ describe('parse()', () => {
             yield 'def';
           })()
         )
-      ).toEqual({ success: false, remaining: 'DEF' });
+      ).toEqual({
+        success: false,
+        remaining: 'DEF',
+        failedOn: { iterationCount: 1, yielded: 'def' },
+      });
     });
   });
 
@@ -57,6 +66,24 @@ describe('parse()', () => {
           (function* () {
             yield 'abc';
             yield 'def';
+          })()
+        )
+      ).toEqual({
+        remaining: '',
+        success: true,
+      });
+    });
+
+    it('accepts empty string', () => {
+      expect(
+        parse(
+          'abcdef',
+          (function* () {
+            yield '';
+            yield 'abc';
+            yield '';
+            yield 'def';
+            yield '';
           })()
         )
       ).toEqual({
@@ -155,7 +182,22 @@ describe('parse()', () => {
       });
     });
 
-    it('accepts regex', () => {
+    it('accepts newlines as string and regex', () => {
+      expect(
+        parse(
+          '\n\n',
+          (function* () {
+            yield '\n';
+            yield /^\n/;
+          })()
+        )
+      ).toEqual({
+        remaining: '',
+        success: true,
+      });
+    });
+
+    it('yields result from regex', () => {
       expect(
         parse(
           'abcdef',
@@ -259,6 +301,146 @@ describe('parse()', () => {
         result: {
           bcd: true,
         },
+      });
+    });
+  });
+
+  describe('ES modules', () => {
+    const code = `import first from 'first-module';
+
+import second from 'second-module';
+
+const a = 'hello!';
+const pi = 3.14159;
+
+export const b = 'some exported';
+    `;
+
+    it('can parse an ES module', () => {
+      const whitespaceMust = /^\s+/;
+      const whitespaceMay = /^\s*/;
+      const semicolonOptional = /^;*/;
+      // See: https://stackoverflow.com/questions/2008279/validate-a-javascript-function-name
+      const identifierRegex = /^[_$a-zA-Z\xA0-\uFFFF][_$a-zA-Z0-9\xA0-\uFFFF]*/;
+      const stringRegex = /^('(?<contentsSingle>([^']|\\['\\bfnrt\/])*)'|"(?<contentsDouble>([^"]|\\['\\bfnrt\/])*)")/;
+
+      function* Identifier() {
+        const [name]: [string] = yield identifierRegex;
+        return { name };
+      }
+
+      function* StringLiteral() {
+        const {
+          groups,
+        }: {
+          groups: Record<'contentsSingle' | 'contentsDouble', string>;
+        } = yield stringRegex;
+        return groups.contentsSingle || groups.contentsDouble || '';
+      }
+
+      function* NumberLiteral() {
+        const [stringValue]: [
+          string
+        ] = yield /^(([\d]+[.][\d]*)|([\d]*[.][\d]+)|([\d]+))/;
+        return parseFloat(stringValue);
+      }
+
+      function* ValueLiteral() {
+        return yield [StringLiteral, NumberLiteral];
+      }
+
+      function* Expression() {
+        return yield [ValueLiteral];
+      }
+
+      function* ConstStatement() {
+        yield 'const';
+        yield whitespaceMust;
+        const { name }: { name: string } = yield Identifier;
+        yield whitespaceMay;
+        yield '=';
+        yield whitespaceMay;
+        const value = yield Expression;
+        yield semicolonOptional;
+        return { type: 'const', name, value };
+      }
+
+      function* ImportStatement() {
+        yield 'import';
+        yield whitespaceMust;
+        const { name: defaultBinding }: { name: string } = yield Identifier;
+        yield whitespaceMust;
+        yield 'from';
+        yield whitespaceMay;
+        const moduleSpecifier = yield StringLiteral;
+        yield semicolonOptional;
+        return {
+          type: 'import',
+          defaultBinding,
+          moduleSpecifier,
+        };
+      }
+
+      function* ExportStatement() {
+        yield 'export';
+        yield whitespaceMust;
+        const exported = yield ConstStatement;
+        return { type: 'export', exported };
+      }
+
+      // function* ExportNamed() {
+      //   yield 'export';
+      //   return { bad: true };
+      // }
+
+      expect(
+        parse(
+          code,
+          (function* () {
+            const lines = [];
+            while (true) {
+              lines.push(
+                yield [ConstStatement, ImportStatement, ExportStatement]
+              );
+              yield /^[\n\s]*/;
+              if (yield isEnd) break;
+            }
+            return lines;
+          })()
+        )
+      ).toEqual({
+        remaining: '',
+        success: true,
+        result: [
+          {
+            type: 'import',
+            defaultBinding: 'first',
+            moduleSpecifier: 'first-module',
+          },
+          {
+            type: 'import',
+            defaultBinding: 'second',
+            moduleSpecifier: 'second-module',
+          },
+          {
+            type: 'const',
+            name: 'a',
+            value: 'hello!',
+          },
+          {
+            type: 'const',
+            name: 'pi',
+            value: 3.14159,
+          },
+          {
+            type: 'export',
+            exported: {
+              type: 'const',
+              name: 'b',
+              value: 'some exported',
+            },
+          },
+        ],
       });
     });
   });
