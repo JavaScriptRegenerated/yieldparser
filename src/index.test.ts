@@ -1,4 +1,4 @@
-import { parse, isEnd } from './index';
+import { parse, hasMore } from './index';
 
 describe('parse()', () => {
   describe('failing', () => {
@@ -393,22 +393,22 @@ export const b = 'some exported';
       //   return { bad: true };
       // }
 
-      expect(
-        parse(
-          code,
-          (function* () {
-            const lines = [];
-            while (true) {
-              lines.push(
-                yield [ConstStatement, ImportStatement, ExportStatement]
-              );
-              yield /^[\n\s]*/;
-              if (yield isEnd) break;
-            }
-            return lines;
-          })()
-        )
-      ).toEqual({
+      function* ESModuleParser() {
+        const lines = [];
+        while (yield hasMore) {
+          lines.push(yield [ConstStatement, ImportStatement, ExportStatement]);
+          yield /^[\n\s]*/;
+        }
+        return lines;
+      }
+
+      expect(parse('', ESModuleParser())).toEqual({
+        remaining: '',
+        success: true,
+        result: [],
+      });
+
+      expect(parse(code, ESModuleParser())).toEqual({
         remaining: '',
         success: true,
         result: [

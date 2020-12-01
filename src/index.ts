@@ -107,3 +107,8 @@ export function* isEnd() {
   const { index }: { index: number } = yield /$/;
   return index === 0;
 }
+
+export function* hasMore() {
+  const { index }: { index: number } = yield /$/;
+  return index > 0;
+}
