@@ -313,102 +313,107 @@ import second from 'second-module';
 const a = 'hello!';
 const pi = 3.14159;
 
+;; ;; ;;
+
 export const b = 'some exported';
     `;
 
-    it('can parse an ES module', () => {
-      const whitespaceMust = /^\s+/;
-      const whitespaceMay = /^\s*/;
-      const semicolonOptional = /^;*/;
-      // See: https://stackoverflow.com/questions/2008279/validate-a-javascript-function-name
-      const identifierRegex = /^[_$a-zA-Z\xA0-\uFFFF][_$a-zA-Z0-9\xA0-\uFFFF]*/;
-      const stringRegex = /^('(?<contentsSingle>([^']|\\['\\bfnrt\/])*)'|"(?<contentsDouble>([^"]|\\['\\bfnrt\/])*)")/;
+    const whitespaceMust = /^\s+/;
+    const whitespaceMay = /^\s*/;
+    const semicolonOptional = /^;*/;
+    // See: https://stackoverflow.com/questions/2008279/validate-a-javascript-function-name
+    const identifierRegex = /^[_$a-zA-Z\xA0-\uFFFF][_$a-zA-Z0-9\xA0-\uFFFF]*/;
+    const stringRegex = /^('(?<contentsSingle>([^']|\\['\\bfnrt\/])*)'|"(?<contentsDouble>([^"]|\\['\\bfnrt\/])*)")/;
 
-      function* Identifier() {
-        const [name]: [string] = yield identifierRegex;
-        return { name };
+    function* Identifier() {
+      const [name]: [string] = yield identifierRegex;
+      return { name };
+    }
+
+    function* StringLiteral() {
+      const {
+        groups,
+      }: {
+        groups: Record<'contentsSingle' | 'contentsDouble', string>;
+      } = yield stringRegex;
+      return groups.contentsSingle || groups.contentsDouble || '';
+    }
+
+    function* NumberLiteral() {
+      const [stringValue]: [
+        string
+      ] = yield /^(([\d]+[.][\d]*)|([\d]*[.][\d]+)|([\d]+))/;
+      return parseFloat(stringValue);
+    }
+
+    function* ValueLiteral() {
+      return yield [StringLiteral, NumberLiteral];
+    }
+
+    function* Expression() {
+      return yield [ValueLiteral];
+    }
+
+    function* ConstStatement() {
+      yield 'const';
+      yield whitespaceMust;
+      const { name }: { name: string } = yield Identifier;
+      yield whitespaceMay;
+      yield '=';
+      yield whitespaceMay;
+      const value = yield Expression;
+      yield semicolonOptional;
+      return { type: 'const', name, value };
+    }
+
+    function* ImportStatement() {
+      yield 'import';
+      yield whitespaceMust;
+      const { name: defaultBinding }: { name: string } = yield Identifier;
+      yield whitespaceMust;
+      yield 'from';
+      yield whitespaceMay;
+      const moduleSpecifier = yield StringLiteral;
+      yield semicolonOptional;
+      return {
+        type: 'import',
+        defaultBinding,
+        moduleSpecifier,
+      };
+    }
+
+    function* ExportStatement() {
+      yield 'export';
+      yield whitespaceMust;
+      const exported = yield ConstStatement;
+      return { type: 'export', exported };
+    }
+
+    // function* ExportNamed() {
+    //   yield 'export';
+    //   return { bad: true };
+    // }
+
+    function* ESModuleParser() {
+      const lines = [];
+      while (yield hasMore) {
+        yield /^[\s;]*/;
+        lines.push(yield [ConstStatement, ImportStatement, ExportStatement]);
+        yield /^[\s;]*/;
       }
+      return lines;
+    }
 
-      function* StringLiteral() {
-        const {
-          groups,
-        }: {
-          groups: Record<'contentsSingle' | 'contentsDouble', string>;
-        } = yield stringRegex;
-        return groups.contentsSingle || groups.contentsDouble || '';
-      }
-
-      function* NumberLiteral() {
-        const [stringValue]: [
-          string
-        ] = yield /^(([\d]+[.][\d]*)|([\d]*[.][\d]+)|([\d]+))/;
-        return parseFloat(stringValue);
-      }
-
-      function* ValueLiteral() {
-        return yield [StringLiteral, NumberLiteral];
-      }
-
-      function* Expression() {
-        return yield [ValueLiteral];
-      }
-
-      function* ConstStatement() {
-        yield 'const';
-        yield whitespaceMust;
-        const { name }: { name: string } = yield Identifier;
-        yield whitespaceMay;
-        yield '=';
-        yield whitespaceMay;
-        const value = yield Expression;
-        yield semicolonOptional;
-        return { type: 'const', name, value };
-      }
-
-      function* ImportStatement() {
-        yield 'import';
-        yield whitespaceMust;
-        const { name: defaultBinding }: { name: string } = yield Identifier;
-        yield whitespaceMust;
-        yield 'from';
-        yield whitespaceMay;
-        const moduleSpecifier = yield StringLiteral;
-        yield semicolonOptional;
-        return {
-          type: 'import',
-          defaultBinding,
-          moduleSpecifier,
-        };
-      }
-
-      function* ExportStatement() {
-        yield 'export';
-        yield whitespaceMust;
-        const exported = yield ConstStatement;
-        return { type: 'export', exported };
-      }
-
-      // function* ExportNamed() {
-      //   yield 'export';
-      //   return { bad: true };
-      // }
-
-      function* ESModuleParser() {
-        const lines = [];
-        while (yield hasMore) {
-          lines.push(yield [ConstStatement, ImportStatement, ExportStatement]);
-          yield /^[\n\s]*/;
-        }
-        return lines;
-      }
-
+    it('accepts empty string', () => {
       expect(parse('', ESModuleParser())).toEqual({
         remaining: '',
         success: true,
         result: [],
       });
+    })
 
-      expect(parse(code, ESModuleParser())).toEqual({
+    describe('valid ES module', () => {
+      const expected = {
         remaining: '',
         success: true,
         result: [
@@ -441,7 +446,16 @@ export const b = 'some exported';
             },
           },
         ],
+      };
+
+      it('can parse an ES module', () => {
+        expect(parse(code, ESModuleParser())).toEqual(expected);
       });
-    });
+
+      it('can parse with leading and trailing whitespace', () => {
+        expect(parse('\n \n ' + code + ' \n \n', ESModuleParser())).toEqual(expected);
+      });
+    })
+    
   });
 });
