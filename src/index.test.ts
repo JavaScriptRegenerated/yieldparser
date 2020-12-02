@@ -1,4 +1,4 @@
-import { parse, hasMore } from './index';
+import { parse, hasMore, mustEnd, may } from './index';
 
 describe('parse()', () => {
   describe('failing', () => {
@@ -305,6 +305,154 @@ describe('parse()', () => {
     });
   });
 
+  describe('IP Address', () => {
+    function* Digit() {
+      const [digit]: [string] = yield /^\d+/;
+      const value = parseInt(digit, 10);
+      if (value < 0 || value > 255) {
+        return new Error(`Digit must be between 0 and 255, was ${value}`);
+      }
+      return value;
+    }
+
+    function* IPAddress() {
+      const first = yield Digit;
+      yield '.';
+      const second = yield Digit;
+      yield '.';
+      const third = yield Digit;
+      yield '.';
+      const fourth = yield Digit;
+      yield mustEnd;
+      return [first, second, third, fourth];
+    }
+
+    it('accepts valid IP addresses', () => {
+      expect(parse('1.2.3.4', IPAddress())).toEqual({
+        success: true,
+        result: [1, 2, 3, 4],
+        remaining: '',
+      });
+
+      expect(parse('255.255.255.255', IPAddress())).toEqual({
+        success: true,
+        result: [255, 255, 255, 255],
+        remaining: '',
+      });
+    });
+
+    it('rejects invalid IP addresses', () => {
+      expect(parse('1.2.3.256', IPAddress())).toEqual({
+        success: false,
+        failedOn: expect.objectContaining({
+          nested: [
+            expect.objectContaining({
+              yielded: new Error('Digit must be between 0 and 255, was 256'),
+            }),
+          ],
+        }),
+        remaining: '256',
+      });
+
+      expect(parse('1.2.3.4.5', IPAddress())).toEqual({
+        success: false,
+        failedOn: expect.objectContaining({
+          yielded: mustEnd,
+        }),
+        remaining: '.5',
+      });
+    });
+  });
+
+  describe('Router', () => {
+    type Route =
+      | { type: 'home' }
+      | { type: 'about' }
+      | { type: 'albums' }
+      | { type: 'album'; id: string }
+      | { type: 'albumArt'; id: string };
+
+    function* Home() {
+      yield '/';
+      yield mustEnd;
+      return { type: 'home' } as Route;
+    }
+
+    function* About() {
+      yield '/about';
+      yield mustEnd;
+      return { type: 'about' } as Route;
+    }
+
+    const Albums = {
+      *List() {
+        yield '/albums';
+        yield mustEnd;
+        return { type: 'albums' } as Route;
+      },
+      *ItemPrefix() {
+        yield '/albums/';
+        const [id]: [string] = yield /^\d+/;
+        return { id };
+      },
+      *Item() {
+        const { id }: { id: string } = yield Albums.ItemPrefix;
+        yield mustEnd;
+        return { type: 'album', id } as Route;
+      },
+      *ItemArt() {
+        const { id }: { id: string } = yield Albums.ItemPrefix;
+        yield '/art';
+        yield mustEnd;
+        return { type: 'albumArt', id } as Route;
+      },
+    };
+
+    function* AlbumRoutes() {
+      return yield [Albums.List, Albums.Item, Albums.ItemArt];
+    }
+
+    function* Route() {
+      return yield [Home, About, AlbumRoutes];
+    }
+
+    it('works with home', () => {
+      expect(parse('/', Route())).toEqual({
+        success: true,
+        result: { type: 'home' },
+        remaining: '',
+      });
+    });
+    it('works with about', () => {
+      expect(parse('/about', Route())).toEqual({
+        success: true,
+        result: { type: 'about' },
+        remaining: '',
+      });
+    });
+    it('works with albums', () => {
+      expect(parse('/albums', Route())).toEqual({
+        success: true,
+        result: { type: 'albums' },
+        remaining: '',
+      });
+    });
+    it('works with album for id', () => {
+      expect(parse('/albums/42', Route())).toEqual({
+        success: true,
+        result: { type: 'album', id: '42' },
+        remaining: '',
+      });
+    });
+    it('works with album art for id', () => {
+      expect(parse('/albums/42/art', Route())).toEqual({
+        success: true,
+        result: { type: 'albumArt', id: '42' },
+        remaining: '',
+      });
+    });
+  });
+
   describe('ES modules', () => {
     const code = `import first from 'first-module';
 
@@ -410,7 +558,7 @@ export const b = 'some exported';
         success: true,
         result: [],
       });
-    })
+    });
 
     describe('valid ES module', () => {
       const expected = {
@@ -453,9 +601,133 @@ export const b = 'some exported';
       });
 
       it('can parse with leading and trailing whitespace', () => {
-        expect(parse('\n \n ' + code + ' \n \n', ESModuleParser())).toEqual(expected);
+        expect(parse('\n \n ' + code + ' \n \n', ESModuleParser())).toEqual(
+          expected
+        );
       });
-    })
-    
+    });
+  });
+
+  describe('CSS', () => {
+    type Selector = string;
+    interface Declaraction {
+      property: string;
+      value: string;
+    }
+    interface Rule {
+      selectors: Array<Selector>;
+      declarations: Array<Declaraction>;
+    }
+
+    const whitespaceMay = /^\s*/;
+
+    function* PropertyParser() {
+      const [name]: [string] = yield /[-a-z]+/;
+      return name;
+    }
+
+    function* ValueParser() {
+      const [rawValue]: [string] = yield /(-?\d+(rem|em|%|px|)|[-a-z]+)/;
+      return rawValue;
+    }
+
+    function* DeclarationParser() {
+      const name = yield PropertyParser;
+      yield whitespaceMay;
+      yield ':';
+      yield whitespaceMay;
+      const rawValue = yield ValueParser;
+      yield whitespaceMay;
+      yield ';';
+      return { name, rawValue };
+    }
+
+    function* RuleParser() {
+      const declarations: Array<Declaraction> = [];
+
+      const [selector]: [string] = yield /(:root|[*]|[a-z][\w]*)/;
+
+      yield whitespaceMay;
+      yield '{';
+      yield whitespaceMay;
+      while ((yield may('}')) === false) {
+        yield whitespaceMay;
+        declarations.push(yield DeclarationParser);
+        yield whitespaceMay;
+      }
+
+      return { selectors: [selector], declarations } as Rule;
+    }
+
+    function* RulesParser() {
+      const rules = [];
+
+      yield whitespaceMay;
+      while (yield hasMore) {
+        rules.push(yield RuleParser);
+        yield whitespaceMay;
+      }
+      return rules;
+    }
+
+    const code = `
+    :root {
+      --first-var: 42rem;
+      --second-var: 15%;
+    }
+
+    * {
+      font: inherit;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      margin-bottom: 1em;
+    }
+    `;
+
+    it('parses', () => {
+      expect(parse(code, RulesParser())).toEqual({
+        success: true,
+        result: [
+          {
+            selectors: [':root'],
+            declarations: [
+              {
+                name: '--first-var',
+                rawValue: '42rem',
+              },
+              {
+                name: '--second-var',
+                rawValue: '15%',
+              },
+            ],
+          },
+          {
+            selectors: ['*'],
+            declarations: [
+              {
+                name: 'font',
+                rawValue: 'inherit',
+              },
+              {
+                name: 'box-sizing',
+                rawValue: 'border-box',
+              },
+            ],
+          },
+          {
+            selectors: ['h1'],
+            declarations: [
+              {
+                name: 'margin-bottom',
+                rawValue: '1em',
+              },
+            ],
+          },
+        ],
+        remaining: '',
+      });
+    });
   });
 });

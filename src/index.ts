@@ -2,7 +2,7 @@ export type ParseItem = string | Iterable<string> | RegExp;
 
 export interface ParseError {
   iterationCount: number;
-  yielded: ParseItem;
+  yielded: ParseItem | Error;
   nested?: Array<ParseError>;
 }
 
@@ -46,6 +46,17 @@ export function parse<Result = void>(
     iterationCount += 1;
     const next = iterator.next(lastResult as any);
     if (next.done) {
+      if (next.value instanceof Error) {
+        return {
+          success: false,
+          remaining: input,
+          failedOn: {
+            iterationCount,
+            yielded: next.value,
+          },
+        };
+      }
+
       return {
         success: true,
         remaining: input,
@@ -103,6 +114,10 @@ export function parse<Result = void>(
   }
 }
 
+export function* mustEnd() {
+  yield /^$/;
+}
+
 export function* isEnd() {
   const { index }: { index: number } = yield /$/;
   return index === 0;
@@ -111,4 +126,10 @@ export function* isEnd() {
 export function* hasMore() {
   const { index }: { index: number } = yield /$/;
   return index > 0;
+}
+
+export function may(prefix: string) {
+  return function* () {
+    return (yield [prefix, '']) !== '';
+  };
 }
