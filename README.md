@@ -20,13 +20,58 @@ npm add parcook
 ### IP Address parser
 
 ```typescript
+import { parse, mustEnd } from 'parcook';
 
+function* Digit() {
+  const [digit]: [string] = yield /^[\d]+/;
+  const value = parseInt(digit, 10);
+  if (value < 0 || value > 255) {
+    return new Error(`Digit must be between 0 and 255, was ${value}`);
+  }
+  return value;
+}
+
+function* IPAddress() {
+  const first = yield Digit;
+  yield '.';
+  const second = yield Digit;
+  yield '.';
+  const third = yield Digit;
+  yield '.';
+  const fourth = yield Digit;
+  yield mustEnd;
+  return [first, second, third, fourth];
+}
+
+parse('1.2.3.4', IPAddress());
+/*
+{
+  success: true,
+  result: [1, 2, 3, 4],
+  remaining: '',
+}
+*/
+
+parse('1.2.3.256', IPAddress());
+/*
+{
+  success: false,
+  failedOn: {
+    nested: [
+      expect.objectContaining({
+        yielded: new Error('Digit must be between 0 and 255, was 256'),
+      }),
+    ],
+  },
+  remaining: '256',
+}
+*/
 ```
 
 ### Basic CSS parser
 
 ```typescript
-import { parse } from 'parcook';
+import { parse, hasMore } from 'parcook';
 
 type Selector = string;
 interface Declaraction {
