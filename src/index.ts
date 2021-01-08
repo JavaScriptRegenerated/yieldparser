@@ -1,4 +1,9 @@
-export type ParseItem = string | Iterable<string> | RegExp;
+export type ParseItem<Result = unknown> =
+  | string
+  | RegExp
+  | Iterable<ParseItem>
+  | (() => Generator<ParseItem, Result, any>);
+export type ParseYieldable<Result = unknown> = ParseItem<Result>;
 
 export interface ParseError {
   iterationCount: number;
@@ -23,11 +28,7 @@ export type ParseYieldedValue<Input extends ParseItem> = Input extends RegExp
   : string;
 
 export type ParseGenerator<Result = unknown> =
-  | Generator<
-      string | Iterable<string> | RegExp,
-      Result,
-      string | RegExpMatchArray
-    >
+  | Generator<ParseItem<any>, Result, string | RegExpMatchArray>
   | Generator<unknown, Result, undefined>
   | Iterable<ParseItem>;
 
@@ -83,6 +84,9 @@ export function parse<Result = void>(
           continue main;
         }
       } else if (choice instanceof RegExp) {
+        if (['^', '$'].includes(choice.source[0]) === false) {
+          throw new Error(`Regex must be from start: ${choice}`);
+        }
         const match = input.match(choice);
         if (match) {
           lastResult = match;
@@ -98,6 +102,17 @@ export function parse<Result = void>(
           continue main;
         } else if (choiceResult.failedOn) {
           nestedErrors.push(choiceResult.failedOn);
+          // if (choiceResult.failedOn.iterationCount > 0) {
+          //   return {
+          //     success: false,
+          //     remaining: input,
+          //     failedOn: {
+          //       iterationCount,
+          //       yielded: choice,
+          //       nested: nestedErrors.length === 0 ? undefined : nestedErrors,
+          //     },
+          //   };
+          // }
         }
       }
     }
@@ -126,10 +141,18 @@ export function* isEnd() {
 export function* hasMore() {
   const { index }: { index: number } = yield /$/;
   return index > 0;
+  // return !(yield isEnd);
 }
 
-export function may(prefix: string) {
+export function may(prefix: ParseYieldable): () => ParseGenerator<boolean> {
   return function* () {
     return (yield [prefix, '']) !== '';
+  };
+}
+
+export function lookAhead(regex: RegExp) {
+  const lookAheadRegex = new RegExp(`^(?=${regex.source})`);
+  return function* () {
+    return yield lookAheadRegex;
   };
 }

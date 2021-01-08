@@ -1,9 +1,9 @@
 <div align="center">
   <h1>🥒 parcook</h1>
   <a href="https://bundlephobia.com/result?p=parcook">
-    <img src="https://badgen.net/bundlephobia/minzip/parcook@0.1.3" alt="minified and gzipped size">
-    <img src="https://badgen.net/bundlephobia/min/parcook@0.1.3" alt="minified size">
-    <img src="https://badgen.net/bundlephobia/dependency-count/parcook@0.1.3" alt="zero dependencies">
+    <img src="https://badgen.net/bundlephobia/minzip/parcook@0.1.4" alt="minified and gzipped size">
+    <img src="https://badgen.net/bundlephobia/min/parcook@0.1.4" alt="minified size">
+    <img src="https://badgen.net/bundlephobia/dependency-count/parcook@0.1.4" alt="zero dependencies">
   </a>
 </div>
 
@@ -20,10 +20,8 @@ npm add parcook
 ### IP Address parser
 
 ```typescript
-import { parse, mustEnd } from 'parcook';
-
 function* Digit() {
-  const [digit]: [string] = yield /^[\d]+/;
+  const [digit]: [string] = yield /^\d+/;
   const value = parseInt(digit, 10);
   if (value < 0 || value > 255) {
     return new Error(`Digit must be between 0 and 255, was ${value}`);
@@ -71,7 +69,7 @@ parse('1.2.3.256', IPAddress());
 ### Basic CSS parser
 
 ```typescript
-import { parse, hasMore } from 'parcook';
+import { parse, hasMore, may } from 'parcook';
 
 type Selector = string;
 interface Declaraction {
@@ -197,9 +195,14 @@ parse(code, RulesParser());
 */
 ```
 
+- Maths expressions: `5 * 6 + 3`
 - Emoticons to Emoji
 - Basic CSS
 - CSV
 - JSON
 - Cron
 - Markdown subset
+
+## TODO
+
+- Allow generating strings by reversing parse process: output yielded strings, track returned object values to read from

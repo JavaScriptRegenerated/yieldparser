@@ -21,5 +21,5 @@ function* IPAddress() {
   return [first, second, third, fourth];
 }
 
-const result = parse('1.2.3.4', IPAddress());
-console.log(result);
+console.log(parse('1.2.3.4', IPAddress()));
+console.log(parse('1.2.3.256', IPAddress()));

@@ -622,12 +622,12 @@ export const b = 'some exported';
     const whitespaceMay = /^\s*/;
 
     function* PropertyParser() {
-      const [name]: [string] = yield /[-a-z]+/;
+      const [name]: [string] = yield /^[-a-z]+/;
       return name;
     }
 
     function* ValueParser() {
-      const [rawValue]: [string] = yield /(-?\d+(rem|em|%|px|)|[-a-z]+)/;
+      const [rawValue]: [string] = yield /^(-?\d+(rem|em|%|px|)|[-a-z]+)/;
       return rawValue;
     }
 
@@ -645,7 +645,7 @@ export const b = 'some exported';
     function* RuleParser() {
       const declarations: Array<Declaraction> = [];
 
-      const [selector]: [string] = yield /(:root|[*]|[a-z][\w]*)/;
+      const [selector]: [string] = yield /^(:root|[*]|[a-z][\w]*)/;
 
       yield whitespaceMay;
       yield '{';
