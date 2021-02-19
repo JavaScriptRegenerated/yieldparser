@@ -196,6 +196,7 @@ parse(code, RulesParser());
 ```
 
 - Maths expressions: `5 * 6 + 3`
+- Semver parser
 - Emoticons to Emoji
 - Basic CSS
 - CSV
