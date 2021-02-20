@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🥒 Yield Parser</h1>
+  <h1>🥒 Parcook</h1>
   <a href="https://bundlephobia.com/result?p=parcook">
     <img src="https://badgen.net/bundlephobia/minzip/parcook@0.2.0" alt="minified and gzipped size">
     <img src="https://badgen.net/bundlephobia/min/parcook@0.2.0" alt="minified size">
@@ -12,7 +12,7 @@ Parse strings using generator functions.
 ## Installations
 
 ```console
-npm add yieldparser
+npm add parcook
 ```
 
 ## Examples
