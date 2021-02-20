@@ -1,6 +1,6 @@
 {
   "name": "parcook",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "license": "MIT",
   "source": "src/index.ts",
   "main": "dist/parcook.js",

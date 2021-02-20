@@ -1,9 +1,9 @@
 <div align="center">
   <h1>🥒 Yield Parser</h1>
   <a href="https://bundlephobia.com/result?p=parcook">
-    <img src="https://badgen.net/bundlephobia/minzip/parcook@0.1.4" alt="minified and gzipped size">
-    <img src="https://badgen.net/bundlephobia/min/parcook@0.1.4" alt="minified size">
-    <img src="https://badgen.net/bundlephobia/dependency-count/parcook@0.1.4" alt="zero dependencies">
+    <img src="https://badgen.net/bundlephobia/minzip/parcook@0.2.0" alt="minified and gzipped size">
+    <img src="https://badgen.net/bundlephobia/min/parcook@0.2.0" alt="minified size">
+    <img src="https://badgen.net/bundlephobia/dependency-count/parcook@0.2.0" alt="zero dependencies">
   </a>
 </div>
 
