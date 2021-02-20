@@ -59,8 +59,10 @@ describe('natural date parser', () => {
     let hours = yield ParseInt;
     const minutes = yield optional(MinutesSuffixParser);
     const amOrPm = yield optional('am', 'pm');
-    if (amOrPm === 'pm') {
+    if (amOrPm === 'pm' && hours <= 11) {
       hours += 12;
+    } else if (amOrPm === 'am' && hours === 12) {
+      hours = 24;
     }
     return { hours, minutes };
   }
@@ -130,8 +132,11 @@ describe('natural date parser', () => {
     ['Wednesdays at 9:30pm', { repeats: 'weekly', weekdays: new Set(['wednesday']), startTime: { hours: 21, minutes: 30 } }],
     ['Mondays at 11:30', { repeats: 'weekly', weekdays: new Set(['monday']), startTime: { hours: 11, minutes: 30 } }],
     ['Mondays at 9:30 to 10:30', { repeats: 'weekly', weekdays: new Set(['monday']), startTime: { hours: 9, minutes: 30 }, endTime: { hours: 10, minutes: 30 } }],
+    ['Mondays 9:30–10:30', { repeats: 'weekly', weekdays: new Set(['monday']), startTime: { hours: 9, minutes: 30 }, endTime: { hours: 10, minutes: 30 } }],
     ['Mondays and Thursdays at 9:30 to 10:30', { repeats: 'weekly', weekdays: new Set(['monday', 'thursday']), startTime: { hours: 9, minutes: 30 }, endTime: { hours: 10, minutes: 30 } }],
     ['Mondays at 9:30pm to 10:30pm', { repeats: 'weekly', weekdays: new Set(['monday']), startTime: { hours: 21, minutes: 30 }, endTime: { hours: 22, minutes: 30 } }],
+    ['Fridays from 11:15am to 12:30pm', { repeats: 'weekly', weekdays: new Set(['friday']), startTime: { hours: 11, minutes: 15 }, endTime: { hours: 12, minutes: 30 } }],
+    ['Fridays from 11:15am to 12:00am', { repeats: 'weekly', weekdays: new Set(['friday']), startTime: { hours: 11, minutes: 15 }, endTime: { hours: 24, minutes: 0 } }],
   ])('%o', (input: string, output) => {
     expect(parseNaturalDate(input)).toEqual({
       success: true,
