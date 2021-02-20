@@ -1,4 +1,4 @@
-import { has, optional, parse, ParseGenerator, ParseYieldable } from './index';
+import { has, optional, parse, ParseGenerator, ParseResult, ParseYieldable } from './index';
 
 describe('natural date parser', () => {
   const whitespaceOptional = /^\s*/;
@@ -80,8 +80,15 @@ describe('natural date parser', () => {
     const endTime = yield optional(TimespanSuffixParser);
     return { startTime, endTime };
   }
+  
+  interface Result {
+    weekdays: Set<Weekday>;
+    repeats: undefined | 'weekly';
+    startTime: { hours: number, minutes?: number };
+    endTime: { hours: number, minutes?: number };
+  }
 
-  function* NaturalDateParser(): ParseGenerator {
+  function* NaturalDateParser(): ParseGenerator<Result> {
     yield whitespaceOptional;
     const { weekdays, repeats } = yield WeekdaysParser;
     yield whitespaceOptional;
@@ -93,12 +100,6 @@ describe('natural date parser', () => {
     return { repeats: repeats ? 'weekly' : undefined, weekdays, ...(timespan as any) };
   }
   
-  interface NaturalDateResult {
-    weekdays: Set<Weekday>;
-    repeats: undefined | 'weekly';
-    startTime: { hours: number, minutes?: number };
-    endTime: { hours: number, minutes?: number };
-  }
   function parseNaturalDate(input: string) {
     input = input.toLowerCase();
     input = input.replace(/[,]/g, '');
