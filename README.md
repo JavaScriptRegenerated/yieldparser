@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>🥒 parcook</h1>
+  <h1>🥒 Yield Parser</h1>
   <a href="https://bundlephobia.com/result?p=parcook">
     <img src="https://badgen.net/bundlephobia/minzip/parcook@0.1.4" alt="minified and gzipped size">
     <img src="https://badgen.net/bundlephobia/min/parcook@0.1.4" alt="minified size">
@@ -12,7 +12,7 @@ Parse strings using generator functions.
 ## Installations
 
 ```console
-npm add parcook
+npm add yieldparser
 ```
 
 ## Examples
@@ -69,7 +69,7 @@ parse('1.2.3.256', IPAddress());
 ### Basic CSS parser
 
 ```typescript
-import { parse, hasMore, may } from 'parcook';
+import { parse, hasMore, has } from 'parcook';
 
 type Selector = string;
 interface Declaraction {
@@ -112,7 +112,7 @@ function* RuleParser() {
   yield whitespaceMay;
   yield '{';
   yield whitespaceMay;
-  while ((yield may('}')) === false) {
+  while ((yield has('}')) === false) {
     yield whitespaceMay;
     declarations.push(yield DeclarationParser);
     yield whitespaceMay;

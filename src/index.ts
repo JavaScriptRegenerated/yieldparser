@@ -144,9 +144,16 @@ export function* hasMore() {
   // return !(yield isEnd);
 }
 
-export function may(prefix: ParseYieldable): () => ParseGenerator<boolean> {
+export function has(prefix: ParseYieldable): () => ParseGenerator<boolean> {
   return function* () {
     return (yield [prefix, '']) !== '';
+  };
+}
+
+export function optional(...potentials: Array<ParseYieldable | any>): () => ParseGenerator<any> {
+  return function* () {
+    const result = yield [...potentials, ''];
+    return result === '' ? undefined : result;
   };
 }
 

@@ -2,7 +2,7 @@ let tailwindExcerpt = `/*! modern-normalize v1.0.0 | MIT License | https://githu
 
 // tailwindExcerpt = `/*! modern-normalize v1.0.0 | MIT License | https://github.com/sindresorhus/modern-normalize */*,::after,::before{box-sizing:border-box}:root{-moz-tab-size:4;tab-size:4}html{line-height:1.15;-webkit-text-size-adjust:100%}body{margin:0}body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji'}hr{height:0;color:inherit}`;
 
-import { parse, hasMore, may, lookAhead, ParseGenerator } from './index';
+import { parse, hasMore, has, lookAhead, ParseGenerator } from './index';
 
 interface CSSComment {
   type: 'comment';
@@ -48,7 +48,7 @@ function* DeclarationParser() {
   yield whitespaceMay;
   const rawValue = yield ValueParser;
   yield whitespaceMay;
-  yield may(';');
+  yield has(';');
   return { name, rawValue };
 }
 
@@ -70,18 +70,18 @@ function* RuleParser(): ParseGenerator<CSSRule> {
   while (true) {
     selectors.push(yield SelectorComponentParser);
     yield whitespaceMay;
-    if (yield may(',')) {
+    if (yield has(',')) {
       yield whitespaceMay;
       continue;
     }
 
-    if (yield may('{')) break;
+    if (yield has('{')) break;
   }
 
   // yield whitespaceMay;
   // yield "{";
   yield whitespaceMay;
-  while ((yield may('}')) === false) {
+  while ((yield has('}')) === false) {
     declarations.push(yield DeclarationParser);
     yield whitespaceMay;
   }
@@ -114,11 +114,11 @@ function* CommentParser(): Generator<
 
 function* RulesParser(): ParseGenerator<Array<CSSRule>> {
   const rules: Array<CSSRule> = [];
-  const closingParent = may(lookAhead(/}/));
+  const hasClosingParent = has(lookAhead(/}/));
 
   yield whitespaceMay;
   while (yield hasMore) {
-    if (yield closingParent) break;
+    if (yield hasClosingParent) break;
 
     rules.push(yield [RuleParser, CommentParser]);
     yield whitespaceMay;

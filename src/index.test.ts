@@ -1,4 +1,4 @@
-import { parse, hasMore, mustEnd, may } from './index';
+import { parse, hasMore, mustEnd, has } from './index';
 
 describe('parse()', () => {
   describe('failing', () => {
@@ -650,7 +650,7 @@ export const b = 'some exported';
       yield whitespaceMay;
       yield '{';
       yield whitespaceMay;
-      while ((yield may('}')) === false) {
+      while ((yield has('}')) === false) {
         yield whitespaceMay;
         declarations.push(yield DeclarationParser);
         yield whitespaceMay;
