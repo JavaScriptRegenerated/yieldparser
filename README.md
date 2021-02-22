@@ -9,7 +9,7 @@
 
 Parse strings using generator functions.
 
-## Installations
+## Installation
 
 ```console
 npm add parcook
