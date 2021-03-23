@@ -1,18 +1,17 @@
 <div align="center">
-  <h1>🥒 Parcook</h1>
-  <a href="https://bundlephobia.com/result?p=parcook">
-    <img src="https://badgen.net/bundlephobia/minzip/parcook@0.2.0" alt="minified and gzipped size">
-    <img src="https://badgen.net/bundlephobia/min/parcook@0.2.0" alt="minified size">
-    <img src="https://badgen.net/bundlephobia/dependency-count/parcook@0.2.0" alt="zero dependencies">
+  <h1>👑 🌿 yieldparse</h1>
+  <p>Parse using composable generator functions. It’s like components for parsing.</p>
+  <a href="https://bundlephobia.com/result?p=yieldparse">
+    <img src="https://badgen.net/bundlephobia/minzip/yieldparse@0.2.0" alt="minified and gzipped size">
+    <img src="https://badgen.net/bundlephobia/min/yieldparse@0.2.0" alt="minified size">
+    <img src="https://badgen.net/bundlephobia/dependency-count/yieldparse@0.2.0" alt="zero dependencies">
   </a>
 </div>
-
-Parse strings using generator functions.
 
 ## Installation
 
 ```console
-npm add parcook
+npm add yieldparse
 ```
 
 ## Examples
@@ -69,7 +68,7 @@ parse('1.2.3.256', IPAddress());
 ### Basic CSS parser
 
 ```typescript
-import { parse, hasMore, has } from 'parcook';
+import { parse, hasMore, has } from 'yieldparse';
 
 type Selector = string;
 interface Declaraction {

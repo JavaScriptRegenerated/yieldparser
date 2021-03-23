@@ -1,11 +1,11 @@
 {
-  "name": "parcook",
+  "name": "yieldparse",
   "version": "0.2.0",
   "license": "MIT",
   "source": "src/index.ts",
-  "main": "dist/parcook.js",
-  "module": "dist/parcook.modern.js",
-  "unpkg": "dist/parcook.umd.js",
+  "main": "dist/yieldparse.js",
+  "module": "dist/yieldparse.modern.js",
+  "unpkg": "dist/yieldparse.umd.js",
   "typings": "dist/index.d.ts",
   "files": [
     "dist",
