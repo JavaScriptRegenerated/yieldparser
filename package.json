@@ -1,11 +1,11 @@
 {
-  "name": "yieldparse",
+  "name": "yieldparser",
   "version": "0.2.0",
   "license": "MIT",
   "source": "src/index.ts",
-  "main": "dist/yieldparse.js",
-  "module": "dist/yieldparse.modern.js",
-  "unpkg": "dist/yieldparse.umd.js",
+  "main": "dist/yieldparser.js",
+  "module": "dist/yieldparser.modern.js",
+  "unpkg": "dist/yieldparser.umd.js",
   "typings": "dist/index.d.ts",
   "files": [
     "dist",

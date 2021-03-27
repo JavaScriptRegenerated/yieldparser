@@ -1,4 +1,4 @@
-import { parse, mustEnd } from 'https://unpkg.com/yieldparse@0.2.0?module';
+import { parse, mustEnd } from 'https://unpkg.com/yieldparser@0.2.0?module';
 
 function* Digit() {
   const [digit]: [string] = yield /^\d+/;
