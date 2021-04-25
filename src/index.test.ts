@@ -1,4 +1,5 @@
 import { parse, hasMore, mustEnd, has } from './index';
+import type { ParseGenerator } from './index';
 
 describe('parse()', () => {
   describe('failing', () => {
@@ -504,8 +505,8 @@ describe('parse()', () => {
       return { selectors: [selector], declarations } as Rule;
     }
 
-    function* RulesParser() {
-      const rules = [];
+    function* RulesParser(): ParseGenerator<Array<Rule>> {
+      const rules: Array<Rule> = [];
 
       yield whitespaceMay;
       while (yield hasMore) {

@@ -129,7 +129,7 @@ function* RulesParser(): ParseGenerator<Array<CSSRule>> {
 }
 
 function* StylesheetParser() {
-  const elements = [];
+  const elements: Array<any> = [];
 
   yield whitespaceMay;
   while (yield hasMore) {
