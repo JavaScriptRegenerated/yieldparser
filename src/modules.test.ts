@@ -8,6 +8,8 @@ import second from 'second-module';
 const a = 'hello!';
 const pi = 3.14159;
 
+function noop() {}
+
 function whoami() {
   return 'admin';
 }
@@ -16,6 +18,12 @@ function* oneTwoThree() {
   yield 1;
   yield 2;
   yield 3;
+}
+
+function closure() {
+  function inner() {}
+  
+  return inner;
 }
 
 ;; ;; ;;
@@ -32,7 +40,7 @@ export const b = 'some exported';
 
     function* Identifier() {
       const [name]: [string] = yield identifierRegex;
-      return { name };
+      return { type: 'identifier', name };
     }
 
     function* StringLiteral() {
@@ -56,7 +64,7 @@ export const b = 'some exported';
     }
 
     function* Expression() {
-      return yield [ValueLiteral];
+      return yield [ValueLiteral, Identifier];
     }
 
     function* ConstStatement() {
@@ -99,10 +107,10 @@ export const b = 'some exported';
       yield whitespaceMay;
       yield '{';
       yield whitespaceMay;
-      let statements = [];
+      let statements: Array<unknown> = [];
       while ((yield has('}')) === false) {
         yield whitespaceMay;
-        const statement = yield [ConstStatement, ReturnStatement, YieldStatement];
+        const statement = yield [ConstStatement, ReturnStatement, YieldStatement, FunctionParser];
         statements.push(statement);
         yield whitespaceMay;
       }
@@ -139,7 +147,7 @@ export const b = 'some exported';
     // }
 
     function* ESModuleParser() {
-      const lines = [];
+      const lines: Array<unknown> = [];
       while (yield hasMore) {
         yield /^[\s;]*/;
         lines.push(yield [ConstStatement, ImportStatement, ExportStatement, FunctionParser]);
@@ -183,6 +191,12 @@ export const b = 'some exported';
           },
           {
             type: 'function',
+            name: 'noop',
+            isGenerator: false,
+            statements: [],
+          },
+          {
+            type: 'function',
             name: 'whoami',
             isGenerator: false,
             statements: [
@@ -208,6 +222,26 @@ export const b = 'some exported';
               {
                 type: 'yield',
                 value: 3
+              }
+            ],
+          },
+          {
+            type: 'function',
+            name: 'closure',
+            isGenerator: false,
+            statements: [
+              {
+                type: 'function',
+                name: 'inner',
+                isGenerator: false,
+                statements: []
+              },
+              {
+                type: 'return',
+                value: {
+                  type: 'identifier',
+                  name: 'inner'
+                }
               }
             ],
           },
