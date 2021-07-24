@@ -68,7 +68,7 @@ parse('1.2.3.256', IPAddress());
 ### Basic CSS parser
 
 ```typescript
-import { parse, hasMore, has } from 'yieldparse';
+import { parse, hasMore, has } from 'yieldparser';
 
 type Selector = string;
 interface Declaraction {
