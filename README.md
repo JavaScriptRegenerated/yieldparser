@@ -19,6 +19,8 @@ npm add yieldparser
 ### IP Address parser
 
 ```typescript
+import { parse, mustEnd } from 'yieldparser';
+
 function* Digit() {
   const [digit]: [string] = yield /^\d+/;
   const value = parseInt(digit, 10);
