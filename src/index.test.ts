@@ -57,6 +57,13 @@ describe('parse()', () => {
         success: true,
       });
     });
+
+    it('only replaces first match', () => {
+      expect(parse('abc123abc', ['abc', '123', 'abc'])).toEqual({
+        remaining: '',
+        success: true,
+      });
+    });
   });
 
   describe('succeeding generator functions', () => {
