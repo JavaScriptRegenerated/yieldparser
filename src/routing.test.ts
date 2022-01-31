@@ -1,4 +1,4 @@
-import { mustEnd, parse } from "./index";
+import { mustEnd, parse, ParseGenerator } from "./index";
 
 describe("Router", () => {
   type Route =
@@ -88,3 +88,95 @@ describe("Router", () => {
     });
   });
 });
+
+describe("Router reversal", () => {
+  type Route =
+    | { type: "home" }
+    | { type: "about" }
+    | { type: "terms" }
+    | { type: "albums" }
+    | { type: "album"; id: string }
+    | { type: "albumArt"; id: string };
+
+  function* Home() {
+    yield "/";
+    yield mustEnd;
+    return { type: "home" } as Route;
+  }
+
+  function* About() {
+    yield "/about";
+    yield mustEnd;
+    return { type: "about" } as Route;
+  }
+
+  function* Terms() {
+    yield "/legal";
+    yield "/terms";
+    yield mustEnd;
+    return { type: "terms" } as Route;
+  }
+
+  function* Route() {
+    return yield [Home, About];
+  }
+
+  it("works", () => {
+    expect(reverse({ type: "home" }, Home())).toEqual("/");
+    expect(reverse({ type: "about" }, About())).toEqual("/about");
+    expect(reverse({ type: "terms" }, Terms())).toEqual("/legal/terms");
+  });
+});
+
+function reverse<Result = void>(
+  output: {},
+  iterable: ParseGenerator<Result>,
+): string | null {
+  let reply: unknown | undefined;
+
+  const expectedKeys = Object.keys(output);
+  if (expectedKeys.length === 0) {
+    throw new Error("Expected object must have keys.");
+  }
+  const iterator = iterable[Symbol.iterator]();
+  const components: Array<string | RegExp> = [];
+
+  while (true) {
+    const next = iterator.next(reply as any);
+    if (next.done) {
+      if (next.value instanceof Error) {
+        return null;
+      }
+
+      const returnedKeys = Object.keys(next.value);
+      if (
+        expectedKeys.length === returnedKeys.length &&
+        expectedKeys.every((key, index) => key === returnedKeys[index])
+      ) {
+        return components.join('');
+      } else {
+        return null;
+      }
+    }
+
+    const yielded = next.value;
+    const choices =
+      typeof yielded !== "string" && (yielded as any)[Symbol.iterator]
+        ? (yielded as Iterable<unknown>)
+        : [yielded];
+
+    for (const choice of choices) {
+      if (typeof choice === "string") {
+        components.push(choice);
+        reply = Symbol(choice);
+      } else if (choice instanceof RegExp) {
+        components.push(choice);
+        reply = Symbol(choice.source);
+      } else if (choice instanceof Function) {
+          // TODO: call
+      }
+    }
+
+    // return components.join("");
+  }
+}
