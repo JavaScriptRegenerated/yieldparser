@@ -117,6 +117,12 @@ describe("Router reversal", () => {
     return { type: "terms" } as Route;
   }
 
+  function* AlbumItem() {
+    yield "/albums/";
+    const [id]: [string] = yield /^\d+/;
+    return { type: "album", id };
+  }
+
   function* Route() {
     return yield [Home, About];
   }
@@ -125,21 +131,23 @@ describe("Router reversal", () => {
     expect(reverse({ type: "home" }, Home())).toEqual("/");
     expect(reverse({ type: "about" }, About())).toEqual("/about");
     expect(reverse({ type: "terms" }, Terms())).toEqual("/legal/terms");
+    expect(reverse({ type: "album", id: "123" }, AlbumItem())).toEqual("/albums/123");
   });
 });
 
 function reverse<Result = void>(
-  output: {},
+  needle: {},
   iterable: ParseGenerator<Result>,
 ): string | null {
   let reply: unknown | undefined;
 
-  const expectedKeys = Object.keys(output);
+  const expectedKeys = Object.keys(needle);
   if (expectedKeys.length === 0) {
     throw new Error("Expected object must have keys.");
   }
   const iterator = iterable[Symbol.iterator]();
   const components: Array<string | RegExp> = [];
+  const regexpMap = new Map<Symbol, { regexp: RegExp; index: number }>();
 
   while (true) {
     const next = iterator.next(reply as any);
@@ -148,10 +156,27 @@ function reverse<Result = void>(
         return null;
       }
 
-      const returnedKeys = Object.keys(next.value);
+      const result = next.value;
+      const resultKeys = new Set(Object.keys(result));
       if (
-        expectedKeys.length === returnedKeys.length &&
-        expectedKeys.every((key, index) => key === returnedKeys[index])
+        expectedKeys.length === resultKeys.size &&
+        expectedKeys.every((key) => {
+          if (!resultKeys.has(key)) {
+            return false;
+          }
+
+          if (typeof result[key] === 'symbol') {
+            const entry = regexpMap.get(result[key]);
+            if (entry !== undefined) {
+              if (entry.regexp.test(needle[key])) {
+                components[entry.index] = needle[key];
+                return true;
+              }
+            }
+          }
+
+          return result[key] === needle[key];
+        })
       ) {
         return components.join('');
       } else {
@@ -168,10 +193,13 @@ function reverse<Result = void>(
     for (const choice of choices) {
       if (typeof choice === "string") {
         components.push(choice);
-        reply = Symbol(choice);
+        reply = choice;
       } else if (choice instanceof RegExp) {
-        components.push(choice);
-        reply = Symbol(choice.source);
+        const index = components.length;
+        components.push('?');
+        const s = Symbol();
+        regexpMap.set(s, { regexp: choice, index });
+        reply = [s];
       } else if (choice instanceof Function) {
           // TODO: call
       }
