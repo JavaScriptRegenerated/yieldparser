@@ -196,7 +196,7 @@ function reverse<Result = void>(
         reply = choice;
       } else if (choice instanceof RegExp) {
         const index = components.length;
-        components.push('?');
+        components.push('???'); // This will be replaced later using the index.
         const s = Symbol();
         regexpMap.set(s, { regexp: choice, index });
         reply = [s];
