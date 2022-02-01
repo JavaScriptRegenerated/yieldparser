@@ -28,11 +28,12 @@ Run `invert(output, yourGeneratorIterable)` to take an expected result and map i
 
 ## Examples
 
-- IP Address (scroll down)
+- [IP Address](#ip-address-parser)
+- [Routes](#routes)
 - [Maths expressions: `5 * 6 + 3`](src/math.test.ts)
+- [Basic CSS](#basic-css-parser)
 - Semver parser
 - Emoticons to Emoji
-- Basic CSS (scroll down)
 - CSV
 - JSON
 - Cron
@@ -87,6 +88,75 @@ parse('1.2.3.256', IPAddress());
   remaining: '256',
 }
 */
+```
+
+### Routes
+
+```typescript
+import { parse, mustEnd, invert } from "yieldparser";
+
+type Route =
+  | { type: "home" }
+  | { type: "about" }
+  | { type: "terms" }
+  | { type: "blog" }
+  | { type: "blogArticle"; slug: string };
+
+function* Home() {
+  yield "/";
+  yield mustEnd;
+  return { type: "home" } as Route;
+}
+
+function* About() {
+  yield "/about";
+  yield mustEnd;
+  return { type: "about" } as Route;
+}
+
+function* Terms() {
+  yield "/legal";
+  yield "/terms";
+  yield mustEnd;
+  return { type: "terms" } as Route;
+}
+
+function* blogPrefix() {
+  yield "/blog";
+}
+
+function* BlogHome() {
+  yield blogPrefix;
+  yield mustEnd;
+  return { type: "blog" };
+}
+
+function* BlogArticle() {
+  yield BlogPrefix;
+  yield "/";
+  const [slug]: [string] = yield /^.+/;
+  return { type: "blogArticle", slug };
+}
+
+function* BlogRoutes() {
+  return yield [BlogHome, BlogArticle];
+}
+
+function* Routes() {
+  return yield [Home, About, Terms, BlogRoutes];
+}
+
+parse("/", Routes()) // result: { type: "home" }, success: true, remaining: "" }
+parse("/about", Routes()) // result: { type: "about" }, success: true, remaining: "" }
+parse("/legal/terms", Routes()) // result: { type: "terms" }, success: true, remaining: "" }
+parse("/blog", Routes()) // result: { type: "blog" }, success: true, remaining: "" }
+parse("/blog/happy-new-year", Routes()) // result: { type: "blogArticle", slug: "happy-new-year" }, success: true, remaining: "" }
+
+invert({ type: "home" }, Routes()) // "/"
+invert({ type: "about" }, Routes()) // "/about"
+invert({ type: "terms" }, Routes()) // "/legal/terms"
+invert({ type: "blog" }, Routes()) // "/blog"
+invert({ type: "blogArticle", slug: "happy-new-year" }, Routes()) // "/blog/happy-new-year"
 ```
 
 ### Basic CSS parser

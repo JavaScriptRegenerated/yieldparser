@@ -123,18 +123,18 @@ describe("Router inversion", () => {
     return { type: "album", id };
   }
 
-  function* BlogPrefix() {
+  function* blogPrefix() {
     yield "/blog";
   }
 
   function* BlogHome() {
-    yield BlogPrefix;
+    yield blogPrefix;
     yield mustEnd;
     return { type: "blog" };
   }
 
   function* BlogArticle() {
-    yield BlogPrefix;
+    yield blogPrefix;
     yield "/";
     const [slug]: [string] = yield /^.+/;
     return { type: "blogArticle", slug };
