@@ -2,9 +2,9 @@
   <h1>👑 🌿 yieldparser</h1>
   <p>Parse using composable generator functions. It’s like components for parsing.</p>
   <a href="https://bundlephobia.com/result?p=yieldparser">
-    <img src="https://badgen.net/bundlephobia/minzip/yieldparser@0.2.0" alt="minified and gzipped size">
-    <img src="https://badgen.net/bundlephobia/min/yieldparser@0.2.0" alt="minified size">
-    <img src="https://badgen.net/bundlephobia/dependency-count/yieldparser@0.2.0" alt="zero dependencies">
+    <img src="https://badgen.net/bundlephobia/minzip/yieldparser@0.3.0" alt="minified and gzipped size">
+    <img src="https://badgen.net/bundlephobia/min/yieldparser@0.3.0" alt="minified size">
+    <img src="https://badgen.net/bundlephobia/dependency-count/yieldparser@0.3.0" alt="zero dependencies">
   </a>
 </div>
 
