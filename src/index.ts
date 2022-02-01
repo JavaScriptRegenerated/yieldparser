@@ -163,3 +163,104 @@ export function lookAhead(regex: RegExp) {
     return yield lookAheadRegex;
   };
 }
+
+////////
+
+export function invert<Result = void>(
+  needle: {},
+  iterable: ParseGenerator<Result>,
+): string | null {
+  const result =  invertInner(needle, iterable);
+  if (result !== null && result.type === 'done') {
+    return result.components.join('');
+  }
+
+  return null;
+}
+
+function invertInner<Result = void>(
+  needle: {},
+  iterable: ParseGenerator<Result>,
+): { type: 'done' | 'prefix'; components: ReadonlyArray<string> } | null {
+  let reply: unknown | undefined;
+
+  const expectedKeys = Object.keys(needle);
+  if (expectedKeys.length === 0) {
+    throw new Error("Expected object must have keys.");
+  }
+  const iterator = iterable[Symbol.iterator]();
+  const components: Array<string> = [];
+  const regexpMap = new Map<Symbol, { regexp: RegExp; index: number }>();
+
+  while (true) {
+    const next = iterator.next(reply as any);
+    if (next.done) {
+      if (next.value instanceof Error) {
+        return null;
+      }
+
+      const result = next.value;
+      if (result == null) {
+        return { type: 'prefix', components: Object.freeze(components) };
+      }
+
+      const resultKeys = new Set(Object.keys(result));
+      if (
+        expectedKeys.length === resultKeys.size &&
+        expectedKeys.every((key) => {
+          if (!resultKeys.has(key)) {
+            return false;
+          }
+
+          if (typeof result[key] === 'symbol') {
+            const entry = regexpMap.get(result[key]);
+            if (entry !== undefined) {
+              if (entry.regexp.test(needle[key])) {
+                components[entry.index] = needle[key];
+                return true;
+              }
+            }
+          }
+
+          return result[key] === needle[key];
+        })
+      ) {
+        return { type: 'done', components: Object.freeze(components) };
+      } else {
+        return null;
+      }
+    }
+
+    const yielded = next.value;
+    const choices =
+      typeof yielded !== "string" && (yielded as any)[Symbol.iterator]
+        ? (yielded as Iterable<unknown>)
+        : [yielded];
+
+    for (const choice of choices) {
+      reply = undefined;
+
+      if (typeof choice === "string") {
+        components.push(choice);
+        reply = choice;
+        break; // Assume first string is the canonical version.
+      } else if (choice instanceof RegExp) {
+        const index = components.length;
+        components.push(''); // This will be replaced later using the index.
+        // components.push('???'); // This will be replaced later using the index.
+        const s = Symbol();
+        regexpMap.set(s, { regexp: choice, index });
+        reply = [s];
+      } else if (choice instanceof Function) {
+        const result = invertInner(needle, choice());
+        if (result != null) {
+          if (result.type === 'done') {
+            return { type: 'done', components: Object.freeze(components.concat(result.components)) };
+          } else {
+            components.push(...result.components);
+          }
+        }
+      }
+    }
+  }
+}

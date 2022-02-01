@@ -1,4 +1,4 @@
-import { mustEnd, parse, ParseGenerator } from "./index";
+import { invert, mustEnd, parse } from "./index";
 
 describe("Router", () => {
   type Route =
@@ -89,7 +89,7 @@ describe("Router", () => {
   });
 });
 
-describe("Router reversal", () => {
+describe("Router inversion", () => {
   type Route =
     | { type: "home" }
     | { type: "about" }
@@ -138,121 +138,22 @@ describe("Router reversal", () => {
   }
 
   it("works with single route definition", () => {
-    expect(reverse({ type: "home" }, Home())).toEqual("/");
-    expect(reverse({ type: "about" }, About())).toEqual("/about");
-    expect(reverse({ type: "terms" }, Terms())).toEqual("/legal/terms");
+    expect(invert({ type: "home" }, Home())).toEqual("/");
+    expect(invert({ type: "about" }, About())).toEqual("/about");
+    expect(invert({ type: "terms" }, Terms())).toEqual("/legal/terms");
   });
 
   it("works with single route definition with param", () => {
-    expect(reverse({ type: "album", id: "123" }, AlbumItem())).toEqual("/albums/123");
+    expect(invert({ type: "album", id: "123" }, AlbumItem())).toEqual("/albums/123");
   })
 
   it("works with nested routes", () => {
-    expect(reverse({ type: "home" }, Route())).toEqual("/");
-    expect(reverse({ type: "about" }, Route())).toEqual("/about");
-    expect(reverse({ type: "terms" }, Route())).toEqual("/legal/terms");
+    expect(invert({ type: "home" }, Route())).toEqual("/");
+    expect(invert({ type: "about" }, Route())).toEqual("/about");
+    expect(invert({ type: "terms" }, Route())).toEqual("/legal/terms");
   });
 
   it("works with routes with nested prefix", () => {
-    expect(reverse({ type: "blogArticle", slug: "hello-world" }, BlogArticle())).toEqual("/blog/hello-world");
+    expect(invert({ type: "blogArticle", slug: "hello-world" }, BlogArticle())).toEqual("/blog/hello-world");
   });
 });
-
-function reverse<Result = void>(
-  needle: {},
-  iterable: ParseGenerator<Result>,
-): string | null {
-  const result =  reverseInner(needle, iterable);
-  if (result !== null && result.type === 'done') {
-    return result.components.join('');
-  }
-
-  return null;
-}
-
-function reverseInner<Result = void>(
-  needle: {},
-  iterable: ParseGenerator<Result>,
-): { type: 'done' | 'prefix'; components: ReadonlyArray<string> } | null {
-  let reply: unknown | undefined;
-
-  const expectedKeys = Object.keys(needle);
-  if (expectedKeys.length === 0) {
-    throw new Error("Expected object must have keys.");
-  }
-  const iterator = iterable[Symbol.iterator]();
-  const components: Array<string> = [];
-  const regexpMap = new Map<Symbol, { regexp: RegExp; index: number }>();
-
-  while (true) {
-    const next = iterator.next(reply as any);
-    if (next.done) {
-      if (next.value instanceof Error) {
-        return null;
-      }
-
-      const result = next.value;
-      if (result == null) {
-        return { type: 'prefix', components: Object.freeze(components) };
-      }
-
-      const resultKeys = new Set(Object.keys(result));
-      if (
-        expectedKeys.length === resultKeys.size &&
-        expectedKeys.every((key) => {
-          if (!resultKeys.has(key)) {
-            return false;
-          }
-
-          if (typeof result[key] === 'symbol') {
-            const entry = regexpMap.get(result[key]);
-            if (entry !== undefined) {
-              if (entry.regexp.test(needle[key])) {
-                components[entry.index] = needle[key];
-                return true;
-              }
-            }
-          }
-
-          return result[key] === needle[key];
-        })
-      ) {
-        return { type: 'done', components: Object.freeze(components) };
-      } else {
-        return null;
-      }
-    }
-
-    const yielded = next.value;
-    const choices =
-      typeof yielded !== "string" && (yielded as any)[Symbol.iterator]
-        ? (yielded as Iterable<unknown>)
-        : [yielded];
-
-    for (const choice of choices) {
-      reply = undefined;
-
-      if (typeof choice === "string") {
-        components.push(choice);
-        reply = choice;
-        break; // Assume first string is the canonical version.
-      } else if (choice instanceof RegExp) {
-        const index = components.length;
-        components.push(''); // This will be replaced later using the index.
-        // components.push('???'); // This will be replaced later using the index.
-        const s = Symbol();
-        regexpMap.set(s, { regexp: choice, index });
-        reply = [s];
-      } else if (choice instanceof Function) {
-        const result = reverseInner(needle, choice());
-        if (result != null) {
-          if (result.type === 'done') {
-            return { type: 'done', components: Object.freeze(components.concat(result.components)) };
-          } else {
-            components.push(...result.components);
-          }
-        }
-      }
-    }
-  }
-}
