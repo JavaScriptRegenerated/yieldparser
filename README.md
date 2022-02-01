@@ -85,7 +85,7 @@ function* BlogHome() {
 }
 
 function* BlogArticle() {
-  yield BlogPrefix;
+  yield blogPrefix;
   yield "/";
   const [slug]: [string] = yield /^.+/;
   return { type: "blogArticle", slug };
