@@ -14,7 +14,29 @@
 npm add yieldparser
 ```
 
+## Overview
+
+Yieldparser parses a source chunk-by-chunk. You define a generator function that yields each chunk to be found. This chunk can be a `string`, a `RexExp`, or another generator function. Your generator function receives replies from parsing that chunk, for example a regular expression would receive a reply with the matches that were found. You then use this information to build a result: the value that your generator function returns. This could be a simple value, or it could be an entire AST (abstract syntax tree).
+
+If you yield an array of choices, then each choice is tested and the first one that matches is used.
+
+If your chunks don’t match the input string, then an error result is returned with the remaining string and the chunk that it failed on. If it succeeds, then a success result is returned with the return value of the generator function, and the remaining string (if there is anything remaining).
+
+Run `parse(input, yourGeneratorIterable)` to take an input string and parse into a result.
+
+Run `invert(output, yourGeneratorIterable)` to take an expected result and map it back to a source string.
+
 ## Examples
+
+- IP Address (scroll down)
+- [Maths expressions: `5 * 6 + 3`](src/math.test.ts)
+- Semver parser
+- Emoticons to Emoji
+- Basic CSS (scroll down)
+- CSV
+- JSON
+- Cron
+- Markdown subset
 
 ### IP Address parser
 
@@ -57,9 +79,9 @@ parse('1.2.3.256', IPAddress());
   success: false,
   failedOn: {
     nested: [
-      expect.objectContaining({
+      {
         yielded: new Error('Digit must be between 0 and 255, was 256'),
-      }),
+      },
     ],
   },
   remaining: '256',
@@ -195,16 +217,3 @@ parse(code, RulesParser());
 }
 */
 ```
-
-- Maths expressions: `5 * 6 + 3`
-- Semver parser
-- Emoticons to Emoji
-- Basic CSS
-- CSV
-- JSON
-- Cron
-- Markdown subset
-
-## TODO
-
-- Allow generating strings by reversing parse process: output yielded strings, track returned object values to read from
