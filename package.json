@@ -20,7 +20,6 @@
     "build": "microbundle --format modern,cjs,umd",
     "test": "jest --watch"
   },
-  "peerDependencies": {},
   "prettier": {
     "printWidth": 80,
     "semi": true,
@@ -29,11 +28,11 @@
   },
   "author": "Patrick Smith",
   "devDependencies": {
+    "@swc/jest": "^0.2.21",
     "@types/jest": "^26.0.15",
     "jest": "^26.6.3",
     "microbundle": "^0.12.4",
     "prettier": "^2.2.0",
-    "ts-jest": "^26.4.4",
     "typescript": "^4.1.2"
   }
 }
