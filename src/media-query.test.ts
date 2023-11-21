@@ -618,4 +618,10 @@ test('matchMedia()', () => {
       'only screen and (min-width: 480px) and (orientation: landscape) and (any-hover: hover)'
     ).matches
   ).toBe(true);
+  expect(
+    matchMedia(
+      screenSized(480, 100, 'touchscreen', 'mouse'),
+      'not print and (min-width: 480px) and (orientation: landscape) and (any-hover: hover)'
+    ).matches
+  ).toBe(true);
 });
