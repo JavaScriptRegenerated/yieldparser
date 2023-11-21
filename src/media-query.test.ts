@@ -1,6 +1,7 @@
 // https://www.w3.org/TR/mediaqueries-5/
 import {
   has,
+  hasMore,
   mustEnd,
   optional,
   parse,
@@ -71,12 +72,108 @@ class ParsedMinWidth {
   }
 }
 
-function* ParseMediaQuery() {
-  type Result = ParsedMediaType | ParsedMinWidth;
+// See https://www.w3.org/TR/mediaqueries-5/#mq-syntax
+type ParsedMediaFeature = ParsedMinWidth;
+type ParsedMediaInParens = ParsedMediaFeature;
+const parsedMediaInParens = [ParsedMinWidth.Parser];
 
-  const result: Result = yield [ParsedMediaType.Parser, ParsedMinWidth.Parser];
-  yield mustEnd;
-  return result;
+class ParsedMediaCondition {
+  constructor(
+    public readonly first: ParsedMediaFeature,
+    public readonly conditions?: ParsedMediaAnds
+  ) {}
+
+  matches(context: { mediaType: 'screen' | 'print'; viewportWidth: number }) {
+    const base = this.first.matches(context);
+    if (this.conditions) {
+      return base && this.conditions.matches(context);
+    } else {
+      return base;
+    }
+  }
+
+  static *Parser() {
+    yield optionalWhitespace;
+    const first: ParsedMediaFeature = yield [ParsedMinWidth.Parser];
+    // const conditions: ParsedMediaAnds | undefined = yield optional(ParsedMediaAnds.Parser);
+    const conditions: ParsedMediaAnds | '' = yield [ParsedMediaAnds.Parser, ''];
+    if (conditions === '') {
+      return first;
+    } else {
+      return new ParsedMediaCondition(first, conditions);
+    }
+  }
+}
+
+class ParsedMediaAnds {
+  constructor(public readonly list: ReadonlyArray<ParsedMediaInParens>) {}
+
+  matches(context: { mediaType: 'screen' | 'print'; viewportWidth: number }) {
+    return this.list.every((m) => m.matches(context));
+  }
+
+  static *Parser() {
+    const list: Array<ParsedMediaInParens> = [];
+
+    do {
+      console.log('and requiredWhitespace 1');
+      yield requiredWhitespace;
+      console.log('and requiredWhitespace 2');
+      yield 'and';
+      yield requiredWhitespace;
+      list.push(yield parsedMediaInParens);
+    } while (yield hasMore);
+
+    return new ParsedMediaAnds(list);
+  }
+}
+
+class ParsedMediaTypeThenConditionWithoutOr {
+  constructor(
+    public readonly mediaType: ParsedMediaType,
+    public readonly and: ReadonlyArray<ParsedMediaInParens>
+  ) {}
+
+  matches(context: { mediaType: 'screen' | 'print'; viewportWidth: number }) {
+    return (
+      this.mediaType.matches(context) &&
+      this.and.every((m) => m.matches(context))
+    );
+  }
+
+  static *Parser() {
+    const mediaType: ParsedMediaType = yield ParsedMediaType.Parser;
+
+    const list: Array<ParsedMediaInParens> = [];
+
+    while (yield has(/^\s+and\s/)) {
+      list.push(yield parsedMediaInParens);
+    }
+
+    if (list.length === 0) {
+      return mediaType;
+    } else {
+      return new ParsedMediaTypeThenConditionWithoutOr(mediaType, list);
+    }
+  }
+}
+
+class ParsedMediaQuery {
+  constructor(
+    public readonly main:
+      | ParsedMediaTypeThenConditionWithoutOr
+      | ParsedMediaType
+  ) {}
+
+  static *Parser() {
+    const main: ParsedMediaQuery['main'] = yield [
+      ParsedMediaTypeThenConditionWithoutOr.Parser,
+      ParsedMediaCondition.Parser,
+    ];
+    yield optionalWhitespace;
+    yield mustEnd;
+    return main;
+  }
 }
 
 interface MatchMediaContext {
@@ -84,24 +181,20 @@ interface MatchMediaContext {
   viewportWidth: number;
 }
 function matchMedia(context: MatchMediaContext, mediaQuery: string) {
-  let matches = false;
-
-  const parsed: ParseResult<ParsedType<typeof ParseMediaQuery>> = parse(
+  const parsed: ParseResult<ParsedMediaQuery> = parse(
     mediaQuery,
-    ParseMediaQuery() as any
+    ParsedMediaQuery.Parser() as any
   );
   if (!parsed.success) {
     throw Error(`Invalid media query: ${mediaQuery}`);
   }
 
-  if (parsed.result instanceof ParsedMediaType) {
-    matches = matches || parsed.result.matches(context);
-  }
+  let matches = false;
   if (
     'matches' in parsed.result &&
     typeof parsed.result.matches === 'function'
   ) {
-    matches = matches || parsed.result.matches(context);
+    matches = parsed.result.matches(context);
   }
 
   return {
@@ -109,8 +202,8 @@ function matchMedia(context: MatchMediaContext, mediaQuery: string) {
   };
 }
 
-test('min-width: 480px', () => {
-  const result = parse('(min-width: 480px)', ParseMediaQuery() as any);
+test('(min-width: 480px)', () => {
+  const result = parse('(min-width: 480px)', ParsedMediaQuery.Parser() as any);
   expect(result).toEqual({
     success: true,
     result: new ParsedMinWidth(480, 'px'),
@@ -118,16 +211,37 @@ test('min-width: 480px', () => {
   });
 });
 
+test('screen', () => {
+  const result = parse('screen', ParsedMediaQuery.Parser() as any);
+  expect(result).toEqual({
+    success: true,
+    result: new ParsedMediaType('screen'),
+    remaining: '',
+  });
+});
+
+test('screen and (min-width: 480px)', () => {
+  const result = parse(
+    'screen and (min-width: 480px)',
+    ParsedMediaQuery.Parser() as any
+  );
+  expect(result).toEqual({
+    success: true,
+    result: new ParsedMediaTypeThenConditionWithoutOr(
+      new ParsedMediaType('screen'),
+      [new ParsedMinWidth(480, 'px')]
+    ),
+    remaining: '',
+  });
+});
+
 test('matchMedia()', () => {
-  const screen = { mediaType: 'screen' } as const;
+  const screenSized = (viewportWidth: number, viewportHeight: number) =>
+    ({ mediaType: 'screen', viewportWidth, viewportHeight } as const);
   const print = { mediaType: 'print' } as const;
 
-  expect(matchMedia({ ...screen, viewportWidth: 100 }, 'screen').matches).toBe(
-    true
-  );
-  expect(matchMedia({ ...screen, viewportWidth: 100 }, 'print').matches).toBe(
-    false
-  );
+  expect(matchMedia(screenSized(100, 100), 'screen').matches).toBe(true);
+  expect(matchMedia(screenSized(100, 100), 'print').matches).toBe(false);
 
   expect(matchMedia({ ...print, viewportWidth: 100 }, 'screen').matches).toBe(
     false
@@ -136,16 +250,16 @@ test('matchMedia()', () => {
     true
   );
 
-  expect(
-    matchMedia({ ...screen, viewportWidth: 478 }, '(min-width: 480px)').matches
-  ).toBe(false);
-  expect(
-    matchMedia({ ...screen, viewportWidth: 479 }, '(min-width: 480px)').matches
-  ).toBe(false);
-  expect(
-    matchMedia({ ...screen, viewportWidth: 480 }, '(min-width: 480px)').matches
-  ).toBe(true);
-  expect(
-    matchMedia({ ...screen, viewportWidth: 481 }, '(min-width: 480px)').matches
-  ).toBe(true);
+  expect(matchMedia(screenSized(478, 100), '(min-width: 480px)').matches).toBe(
+    false
+  );
+  expect(matchMedia(screenSized(479, 100), '(min-width: 480px)').matches).toBe(
+    false
+  );
+  expect(matchMedia(screenSized(480, 100), '(min-width: 480px)').matches).toBe(
+    true
+  );
+  expect(matchMedia(screenSized(481, 100), '(min-width: 480px)').matches).toBe(
+    true
+  );
 });
