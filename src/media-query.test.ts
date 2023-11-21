@@ -36,6 +36,7 @@ interface MatchMediaContext {
   mediaType: 'screen' | 'print';
   viewportWidth: number;
   viewportHeight: number;
+  viewportZoom: number;
   rootFontSizePx: number;
   primaryPointingDevice?: 'touchscreen' | 'mouse';
   secondaryPointingDevice?: 'touchscreen' | 'mouse';
@@ -372,6 +373,29 @@ test('screen and (min-width: 480px)', () => {
 
 test('matchMedia()', () => {
   const defaultRootFontSizePx = 16;
+  const viewport = (width: number, height: number, zoom: number = 1) =>
+    ({
+      viewportWidth: width / zoom,
+      viewportHeight: height / zoom,
+      viewportZoom: zoom,
+    } as const);
+
+  const screen = (
+    viewport: Pick<
+      MatchMediaContext,
+      'viewportWidth' | 'viewportHeight' | 'viewportZoom'
+    >,
+    primaryPointingDevice: 'touchscreen' | 'mouse' | undefined = 'touchscreen',
+    secondaryPointingDevice?: 'touchscreen' | 'mouse'
+  ) =>
+    ({
+      mediaType: 'screen',
+      ...viewport,
+      rootFontSizePx: defaultRootFontSizePx,
+      primaryPointingDevice,
+      secondaryPointingDevice,
+    } as const);
+
   const screenSized = (
     viewportWidth: number,
     viewportHeight: number,
@@ -382,6 +406,7 @@ test('matchMedia()', () => {
       mediaType: 'screen',
       viewportWidth,
       viewportHeight,
+      viewportZoom: 1,
       rootFontSizePx: defaultRootFontSizePx,
       primaryPointingDevice,
       secondaryPointingDevice,
@@ -392,6 +417,7 @@ test('matchMedia()', () => {
       mediaType: 'print',
       viewportWidth,
       viewportHeight,
+      viewportZoom: 1,
       rootFontSizePx: defaultRootFontSizePx,
     } as const);
 
@@ -419,25 +445,45 @@ test('matchMedia()', () => {
     true
   );
 
-  expect(matchMedia(screenSized(479, 100), '(min-width: 30em)').matches).toBe(
-    false
-  );
-  expect(matchMedia(screenSized(480, 100), '(min-width: 30em)').matches).toBe(
-    true
-  );
-  expect(matchMedia(screenSized(481, 100), '(min-width: 30em)').matches).toBe(
-    true
-  );
+  expect(
+    matchMedia(screen(viewport(479, 100)), '(min-width: 30em)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screen(viewport(480, 100)), '(min-width: 30em)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screen(viewport(481, 100)), '(min-width: 30em)').matches
+  ).toBe(true);
 
-  expect(matchMedia(screenSized(479, 100), '(min-width: 30rem)').matches).toBe(
-    false
-  );
-  expect(matchMedia(screenSized(480, 100), '(min-width: 30rem)').matches).toBe(
-    true
-  );
-  expect(matchMedia(screenSized(481, 100), '(min-width: 30rem)').matches).toBe(
-    true
-  );
+  expect(
+    matchMedia(screen(viewport(480, 100, 0.5)), '(min-width: 15em)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screen(viewport(480, 100, 2.0)), '(min-width: 15em)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screen(viewport(480, 100, 2.1)), '(min-width: 15em)').matches
+  ).toBe(false);
+
+  expect(
+    matchMedia(screen(viewport(480, 100, 0.5)), '(min-width: 60em)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screen(viewport(480, 100, 0.55)), '(min-width: 60em)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screen(viewport(480, 100, 2.0)), '(min-width: 60em)').matches
+  ).toBe(false);
+
+  expect(
+    matchMedia(screen(viewport(479, 100)), '(min-width: 30rem)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screen(viewport(480, 100)), '(min-width: 30rem)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screen(viewport(481, 100)), '(min-width: 30rem)').matches
+  ).toBe(true);
 
   expect(
     matchMedia(screenSized(200, 100), '(orientation: landscape)').matches
