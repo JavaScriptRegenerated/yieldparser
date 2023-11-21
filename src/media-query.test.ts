@@ -32,6 +32,12 @@ function* ParseInt() {
   return parseInt(stringValue, 10) * (isNegative ? -1 : 1);
 }
 
+interface MatchMediaContext {
+  mediaType: 'screen' | 'print';
+  viewportWidth: number;
+  viewportHeight: number;
+}
+
 class ParsedMediaType {
   constructor(public readonly mediaType: 'screen' | 'print' | 'all') {}
 
@@ -42,8 +48,29 @@ class ParsedMediaType {
 
   static *Parser() {
     yield optionalWhitespace;
+    yield optional(() => ['only', requiredWhitespace]);
     const mediaType: ParsedMediaType['mediaType'] = yield ['screen', 'print'];
     return new ParsedMediaType(mediaType);
+  }
+}
+
+class ParsedNotMediaType {
+  constructor(public readonly mediaType: 'screen' | 'print' | 'all') {}
+
+  matches(context: { mediaType: 'screen' | 'print' }) {
+    if (this.mediaType === 'all') return false;
+    return this.mediaType !== context.mediaType;
+  }
+
+  static *Parser() {
+    yield optionalWhitespace;
+    yield 'not';
+    yield requiredWhitespace;
+    const mediaType: ParsedNotMediaType['mediaType'] = yield [
+      'screen',
+      'print',
+    ];
+    return new ParsedNotMediaType(mediaType);
   }
 }
 
@@ -72,10 +99,40 @@ class ParsedMinWidth {
   }
 }
 
+/**
+ https://www.w3.org/TR/mediaqueries-5/#orientation
+ */
+class ParsedOrientation {
+  constructor(public readonly orientation: 'portrait' | 'landscape') {}
+
+  matches(context: { viewportWidth: number; viewportHeight: number }) {
+    const calculated =
+      context.viewportHeight >= context.viewportWidth
+        ? 'portrait'
+        : 'landscape';
+    return this.orientation === calculated;
+  }
+
+  static *Parser() {
+    yield optionalWhitespace;
+    yield '(';
+    yield 'orientation:';
+    yield optionalWhitespace;
+    const orientation: 'portrait' | 'landscape' = yield [
+      'portrait',
+      'landscape',
+    ];
+    yield optionalWhitespace;
+    yield ')';
+    return new ParsedOrientation(orientation);
+  }
+}
+
 // See https://www.w3.org/TR/mediaqueries-5/#mq-syntax
-type ParsedMediaFeature = ParsedMinWidth;
+const parsedMediaFeature = [ParsedMinWidth.Parser, ParsedOrientation.Parser];
+const parsedMediaInParens = [...parsedMediaFeature];
+type ParsedMediaFeature = ParsedType<typeof parsedMediaFeature[-1]>;
 type ParsedMediaInParens = ParsedMediaFeature;
-const parsedMediaInParens = [ParsedMinWidth.Parser];
 
 class ParsedMediaCondition {
   constructor(
@@ -83,7 +140,7 @@ class ParsedMediaCondition {
     public readonly conditions?: ParsedMediaAnds
   ) {}
 
-  matches(context: { mediaType: 'screen' | 'print'; viewportWidth: number }) {
+  matches(context: MatchMediaContext) {
     const base = this.first.matches(context);
     if (this.conditions) {
       return base && this.conditions.matches(context);
@@ -94,7 +151,7 @@ class ParsedMediaCondition {
 
   static *Parser() {
     yield optionalWhitespace;
-    const first: ParsedMediaFeature = yield [ParsedMinWidth.Parser];
+    const first: ParsedMediaInParens = yield parsedMediaInParens;
     // const conditions: ParsedMediaAnds | undefined = yield optional(ParsedMediaAnds.Parser);
     const conditions: ParsedMediaAnds | '' = yield [ParsedMediaAnds.Parser, ''];
     if (conditions === '') {
@@ -108,7 +165,7 @@ class ParsedMediaCondition {
 class ParsedMediaAnds {
   constructor(public readonly list: ReadonlyArray<ParsedMediaInParens>) {}
 
-  matches(context: { mediaType: 'screen' | 'print'; viewportWidth: number }) {
+  matches(context: MatchMediaContext) {
     return this.list.every((m) => m.matches(context));
   }
 
@@ -130,11 +187,11 @@ class ParsedMediaAnds {
 
 class ParsedMediaTypeThenConditionWithoutOr {
   constructor(
-    public readonly mediaType: ParsedMediaType,
+    public readonly mediaType: ParsedMediaType | ParsedNotMediaType,
     public readonly and: ReadonlyArray<ParsedMediaInParens>
   ) {}
 
-  matches(context: { mediaType: 'screen' | 'print'; viewportWidth: number }) {
+  matches(context: MatchMediaContext) {
     return (
       this.mediaType.matches(context) &&
       this.and.every((m) => m.matches(context))
@@ -142,7 +199,10 @@ class ParsedMediaTypeThenConditionWithoutOr {
   }
 
   static *Parser() {
-    const mediaType: ParsedMediaType = yield ParsedMediaType.Parser;
+    const mediaType: ParsedMediaType | ParsedNotMediaType = yield [
+      ParsedMediaType.Parser,
+      ParsedNotMediaType.Parser,
+    ];
 
     const list: Array<ParsedMediaInParens> = [];
 
@@ -176,10 +236,6 @@ class ParsedMediaQuery {
   }
 }
 
-interface MatchMediaContext {
-  mediaType: 'screen' | 'print';
-  viewportWidth: number;
-}
 function matchMedia(context: MatchMediaContext, mediaQuery: string) {
   const parsed: ParseResult<ParsedMediaQuery> = parse(
     mediaQuery,
@@ -202,6 +258,15 @@ function matchMedia(context: MatchMediaContext, mediaQuery: string) {
   };
 }
 
+test('screen', () => {
+  const result = parse('screen', ParsedMediaQuery.Parser() as any);
+  expect(result).toEqual({
+    success: true,
+    result: new ParsedMediaType('screen'),
+    remaining: '',
+  });
+});
+
 test('(min-width: 480px)', () => {
   const result = parse('(min-width: 480px)', ParsedMediaQuery.Parser() as any);
   expect(result).toEqual({
@@ -211,11 +276,14 @@ test('(min-width: 480px)', () => {
   });
 });
 
-test('screen', () => {
-  const result = parse('screen', ParsedMediaQuery.Parser() as any);
+test('(orientation: landscape)', () => {
+  const result = parse(
+    '(orientation: landscape)',
+    ParsedMediaQuery.Parser() as any
+  );
   expect(result).toEqual({
     success: true,
-    result: new ParsedMediaType('screen'),
+    result: new ParsedOrientation('landscape'),
     remaining: '',
   });
 });
@@ -238,17 +306,19 @@ test('screen and (min-width: 480px)', () => {
 test('matchMedia()', () => {
   const screenSized = (viewportWidth: number, viewportHeight: number) =>
     ({ mediaType: 'screen', viewportWidth, viewportHeight } as const);
-  const print = { mediaType: 'print' } as const;
+  const printSized = (viewportWidth: number, viewportHeight: number) =>
+    ({ mediaType: 'print', viewportWidth, viewportHeight } as const);
 
   expect(matchMedia(screenSized(100, 100), 'screen').matches).toBe(true);
+  expect(matchMedia(screenSized(100, 100), 'only screen').matches).toBe(true);
+  expect(matchMedia(screenSized(100, 100), 'not screen').matches).toBe(false);
   expect(matchMedia(screenSized(100, 100), 'print').matches).toBe(false);
+  expect(matchMedia(screenSized(100, 100), 'only print').matches).toBe(false);
 
-  expect(matchMedia({ ...print, viewportWidth: 100 }, 'screen').matches).toBe(
-    false
-  );
-  expect(matchMedia({ ...print, viewportWidth: 100 }, 'print').matches).toBe(
-    true
-  );
+  expect(matchMedia(printSized(100, 100), 'screen').matches).toBe(false);
+  expect(matchMedia(printSized(100, 100), 'only screen').matches).toBe(false);
+  expect(matchMedia(printSized(100, 100), 'print').matches).toBe(true);
+  expect(matchMedia(printSized(100, 100), 'only print').matches).toBe(true);
 
   expect(matchMedia(screenSized(478, 100), '(min-width: 480px)').matches).toBe(
     false
@@ -262,4 +332,37 @@ test('matchMedia()', () => {
   expect(matchMedia(screenSized(481, 100), '(min-width: 480px)').matches).toBe(
     true
   );
+
+  expect(
+    matchMedia(screenSized(200, 100), '(orientation: landscape)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(200, 100), '(orientation: portrait)').matches
+  ).toBe(false);
+
+  expect(
+    matchMedia(screenSized(100, 200), '(orientation: landscape)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 200), '(orientation: portrait)').matches
+  ).toBe(true);
+
+  expect(
+    matchMedia(screenSized(100, 100), '(orientation: landscape)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100), '(orientation: portrait)').matches
+  ).toBe(true);
+
+  expect(
+    matchMedia(screenSized(481, 100), 'screen and (min-width: 480px)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(481, 100), 'only screen and (min-width: 480px)')
+      .matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(481, 100), 'only screen and (min-width: 480px) and (orientation: landscape)')
+      .matches
+  ).toBe(true);
 });
