@@ -148,6 +148,75 @@ class ParsedOrientation {
 /**
  https://www.w3.org/TR/mediaqueries-5/#hover
  */
+const PointerAccuracy = Object.freeze({
+  none: 0,
+  coarse: 1,
+  fine: 2,
+
+  fromDevice(device: 'touchscreen' | 'mouse' | undefined) {
+    switch (device) {
+      case 'mouse':
+        return PointerAccuracy.fine;
+      case 'touchscreen':
+        return PointerAccuracy.coarse;
+      default:
+        return PointerAccuracy.none;
+    }
+  },
+});
+type PointerLevels = typeof PointerAccuracy['none' | 'coarse' | 'fine'];
+class ParsedPointer {
+  constructor(
+    public readonly accuracy: 'none' | 'coarse' | 'fine',
+    public readonly any?: 'any'
+  ) {}
+
+  private get minLevel() {
+    return PointerAccuracy[this.accuracy];
+  }
+
+  private primaryAccuracy(context: MatchMediaContext) {
+    return PointerAccuracy.fromDevice(context.primaryPointingDevice);
+  }
+
+  private bestAccuracy(context: MatchMediaContext) {
+    return Math.max(
+      PointerAccuracy.fromDevice(context.primaryPointingDevice),
+      PointerAccuracy.fromDevice(context.secondaryPointingDevice)
+    ) as PointerLevels;
+  }
+
+  matches(context: MatchMediaContext) {
+    const minLevel = this.minLevel;
+    const deviceLevel =
+      this.any === 'any'
+        ? this.bestAccuracy(context)
+        : this.primaryAccuracy(context);
+
+    if (minLevel === PointerAccuracy.none) {
+      return deviceLevel === PointerAccuracy.none;
+    }
+
+    return deviceLevel >= minLevel;
+  }
+
+  static *Parser() {
+    yield optionalWhitespace;
+    yield '(';
+    yield optionalWhitespace;
+    const any: boolean = yield has('any-');
+    yield 'pointer:';
+    yield optionalWhitespace;
+    const hover: 'none' | 'coarse' | 'fine' = yield ['none', 'coarse', 'fine'];
+    yield optionalWhitespace;
+    yield ')';
+    return new ParsedPointer(hover, any ? 'any' : undefined);
+  }
+}
+
+/**
+ https://www.w3.org/TR/mediaqueries-5/#hover
+ */
 class ParsedHover {
   constructor(
     public readonly hover: 'none' | 'hover',
@@ -204,6 +273,7 @@ const parsedMediaFeature = [
   ParsedMinWidth.Parser,
   ParsedOrientation.Parser,
   ParsedHover.Parser,
+  ParsedPointer.Parser,
 ];
 const parsedMediaInParens = [...parsedMediaFeature];
 type ParsedMediaFeature = ParsedType<typeof parsedMediaFeature[-1]>;
@@ -430,7 +500,7 @@ test('matchMedia()', () => {
   const screenSized = (
     viewportWidth: number,
     viewportHeight: number,
-    primaryPointingDevice: 'touchscreen' | 'mouse' | undefined = 'touchscreen',
+    primaryPointingDevice: 'touchscreen' | 'mouse' | null = 'touchscreen',
     secondaryPointingDevice?: 'touchscreen' | 'mouse'
   ) =>
     ({
@@ -439,7 +509,7 @@ test('matchMedia()', () => {
       viewportHeight,
       viewportZoom: 1,
       rootFontSizePx: defaultRootFontSizePx,
-      primaryPointingDevice,
+      primaryPointingDevice: primaryPointingDevice ?? undefined,
       secondaryPointingDevice,
     } as const);
 
@@ -551,6 +621,26 @@ test('matchMedia()', () => {
     matchMedia(screenSized(100, 100, 'touchscreen'), '(any-hover: hover)')
       .matches
   ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(pointer: none)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(pointer: coarse)')
+      .matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(pointer: fine)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(any-pointer: none)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(any-pointer: coarse)')
+      .matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(any-pointer: fine)').matches
+  ).toBe(false);
 
   expect(
     matchMedia(screenSized(100, 100, 'touchscreen', 'mouse'), '(hover: none)')
@@ -572,6 +662,16 @@ test('matchMedia()', () => {
       '(any-hover: hover)'
     ).matches
   ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen', 'mouse'), '(any-pointer: none)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen', 'mouse'), '(any-pointer: coarse)')
+      .matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen', 'mouse'), '(any-pointer: fine)').matches
+  ).toBe(true);
 
   expect(
     matchMedia(screenSized(100, 100, 'mouse'), '(hover: none)').matches
@@ -584,6 +684,24 @@ test('matchMedia()', () => {
   ).toBe(false);
   expect(
     matchMedia(screenSized(100, 100, 'mouse'), '(any-hover: hover)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse'), '(pointer: none)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse'), '(pointer: coarse)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse'), '(pointer: fine)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse'), '(any-pointer: none)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse'), '(any-pointer: coarse)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse'), '(any-pointer: fine)').matches
   ).toBe(true);
 
   expect(
@@ -607,17 +725,35 @@ test('matchMedia()', () => {
     ).matches
   ).toBe(true);
 
+  expect(matchMedia(screenSized(100, 100, null), '(hover: none)').matches).toBe(
+    true
+  );
   expect(
-    matchMedia(screenSized(100, 100, undefined), '(hover: none)').matches
-  ).toBe(true);
-  expect(
-    matchMedia(screenSized(100, 100, undefined), '(hover: hover)').matches
+    matchMedia(screenSized(100, 100, null), '(hover: hover)').matches
   ).toBe(false);
   expect(
-    matchMedia(screenSized(100, 100, undefined), '(any-hover: none)').matches
+    matchMedia(screenSized(100, 100, null), '(any-hover: none)').matches
   ).toBe(true);
   expect(
-    matchMedia(screenSized(100, 100, undefined), '(any-hover: hover)').matches
+    matchMedia(screenSized(100, 100, null), '(any-hover: hover)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, null), '(pointer: none)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, null), '(pointer: coarse)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, null), '(pointer: fine)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, null), '(any-pointer: none)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, null), '(any-pointer: coarse)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, null), '(any-pointer: fine)').matches
   ).toBe(false);
 
   expect(
