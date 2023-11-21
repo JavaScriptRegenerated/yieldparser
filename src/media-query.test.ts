@@ -36,6 +36,7 @@ interface MatchMediaContext {
   mediaType: 'screen' | 'print';
   viewportWidth: number;
   viewportHeight: number;
+  rootFontSizePx: number;
   primaryPointingDevice?: 'touchscreen' | 'mouse';
   secondaryPointingDevice?: 'touchscreen' | 'mouse';
 }
@@ -82,10 +83,18 @@ class ParsedMinWidth {
     public readonly unit: 'px' | 'em' | 'rem'
   ) {}
 
-  matches(context: { viewportWidth: number }) {
-    if (this.unit !== 'px') throw Error('Only supports px for now.');
+  private valueInPx(context: MatchMediaContext): number {
+    switch (this.unit) {
+      case 'px':
+        return this.value;
+      case 'rem':
+      case 'em':
+        return this.value * context.rootFontSizePx;
+    }
+  }
 
-    return this.value <= context.viewportWidth;
+  matches(context: MatchMediaContext) {
+    return this.valueInPx(context) <= context.viewportWidth;
   }
 
   static *Parser() {
@@ -362,6 +371,7 @@ test('screen and (min-width: 480px)', () => {
 });
 
 test('matchMedia()', () => {
+  const defaultRootFontSizePx = 16;
   const screenSized = (
     viewportWidth: number,
     viewportHeight: number,
@@ -372,12 +382,18 @@ test('matchMedia()', () => {
       mediaType: 'screen',
       viewportWidth,
       viewportHeight,
+      rootFontSizePx: defaultRootFontSizePx,
       primaryPointingDevice,
       secondaryPointingDevice,
     } as const);
 
   const printSized = (viewportWidth: number, viewportHeight: number) =>
-    ({ mediaType: 'print', viewportWidth, viewportHeight } as const);
+    ({
+      mediaType: 'print',
+      viewportWidth,
+      viewportHeight,
+      rootFontSizePx: defaultRootFontSizePx,
+    } as const);
 
   expect(matchMedia(screenSized(100, 100), 'screen').matches).toBe(true);
   expect(matchMedia(screenSized(100, 100), 'only screen').matches).toBe(true);
@@ -400,6 +416,26 @@ test('matchMedia()', () => {
     true
   );
   expect(matchMedia(screenSized(481, 100), '(min-width: 480px)').matches).toBe(
+    true
+  );
+
+  expect(matchMedia(screenSized(479, 100), '(min-width: 30em)').matches).toBe(
+    false
+  );
+  expect(matchMedia(screenSized(480, 100), '(min-width: 30em)').matches).toBe(
+    true
+  );
+  expect(matchMedia(screenSized(481, 100), '(min-width: 30em)').matches).toBe(
+    true
+  );
+
+  expect(matchMedia(screenSized(479, 100), '(min-width: 30rem)').matches).toBe(
+    false
+  );
+  expect(matchMedia(screenSized(480, 100), '(min-width: 30rem)').matches).toBe(
+    true
+  );
+  expect(matchMedia(screenSized(481, 100), '(min-width: 30rem)').matches).toBe(
     true
   );
 
@@ -522,13 +558,13 @@ test('matchMedia()', () => {
   ).toBe(true);
   expect(
     matchMedia(
-      screenSized(480, 100, "touchscreen"),
+      screenSized(480, 100, 'touchscreen'),
       'only screen and (min-width: 480px) and (orientation: landscape) and (any-hover: hover)'
     ).matches
   ).toBe(false);
   expect(
     matchMedia(
-      screenSized(480, 100, "touchscreen", "mouse"),
+      screenSized(480, 100, 'touchscreen', 'mouse'),
       'only screen and (min-width: 480px) and (orientation: landscape) and (any-hover: hover)'
     ).matches
   ).toBe(true);
