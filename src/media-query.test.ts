@@ -36,6 +36,8 @@ interface MatchMediaContext {
   mediaType: 'screen' | 'print';
   viewportWidth: number;
   viewportHeight: number;
+  primaryPointingDevice?: 'touchscreen' | 'mouse';
+  secondaryPointingDevice?: 'touchscreen' | 'mouse';
 }
 
 class ParsedMediaType {
@@ -128,8 +130,65 @@ class ParsedOrientation {
   }
 }
 
+/**
+ https://www.w3.org/TR/mediaqueries-5/#hover
+ */
+class ParsedHover {
+  constructor(
+    public readonly hover: 'none' | 'hover',
+    public readonly any?: 'any'
+  ) {}
+
+  private canPrimaryHover(context: MatchMediaContext) {
+    switch (context.primaryPointingDevice) {
+      case 'mouse':
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private canAnyHover(context: MatchMediaContext) {
+    switch (context.secondaryPointingDevice) {
+      case 'mouse':
+        return true;
+      default:
+        return this.canPrimaryHover(context);
+    }
+  }
+
+  matches(context: MatchMediaContext) {
+    const canHover =
+      this.any === 'any'
+        ? this.canAnyHover(context)
+        : this.canPrimaryHover(context);
+
+    if (canHover) {
+      return this.hover === 'hover';
+    } else {
+      return this.hover === 'none';
+    }
+  }
+
+  static *Parser() {
+    yield optionalWhitespace;
+    yield '(';
+    const any: boolean = yield has('any-');
+    yield 'hover:';
+    yield optionalWhitespace;
+    const hover: 'none' | 'hover' = yield ['none', 'hover'];
+    yield optionalWhitespace;
+    yield ')';
+    return new ParsedHover(hover, any ? 'any' : undefined);
+  }
+}
+
 // See https://www.w3.org/TR/mediaqueries-5/#mq-syntax
-const parsedMediaFeature = [ParsedMinWidth.Parser, ParsedOrientation.Parser];
+const parsedMediaFeature = [
+  ParsedMinWidth.Parser,
+  ParsedOrientation.Parser,
+  ParsedHover.Parser,
+];
 const parsedMediaInParens = [...parsedMediaFeature];
 type ParsedMediaFeature = ParsedType<typeof parsedMediaFeature[-1]>;
 type ParsedMediaInParens = ParsedMediaFeature;
@@ -302,8 +361,20 @@ test('screen and (min-width: 480px)', () => {
 });
 
 test('matchMedia()', () => {
-  const screenSized = (viewportWidth: number, viewportHeight: number) =>
-    ({ mediaType: 'screen', viewportWidth, viewportHeight } as const);
+  const screenSized = (
+    viewportWidth: number,
+    viewportHeight: number,
+    primaryPointingDevice: 'touchscreen' | 'mouse' | undefined = 'touchscreen',
+    secondaryPointingDevice?: 'touchscreen' | 'mouse'
+  ) =>
+    ({
+      mediaType: 'screen',
+      viewportWidth,
+      viewportHeight,
+      primaryPointingDevice,
+      secondaryPointingDevice,
+    } as const);
+
   const printSized = (viewportWidth: number, viewportHeight: number) =>
     ({ mediaType: 'print', viewportWidth, viewportHeight } as const);
 
@@ -353,6 +424,89 @@ test('matchMedia()', () => {
   ).toBe(true);
 
   expect(
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(hover: none)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(hover: hover)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(any-hover: none)')
+      .matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(any-hover: hover)')
+      .matches
+  ).toBe(false);
+
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen', 'mouse'), '(hover: none)')
+      .matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'touchscreen', 'mouse'), '(hover: hover)')
+      .matches
+  ).toBe(false);
+  expect(
+    matchMedia(
+      screenSized(100, 100, 'touchscreen', 'mouse'),
+      '(any-hover: none)'
+    ).matches
+  ).toBe(false);
+  expect(
+    matchMedia(
+      screenSized(100, 100, 'touchscreen', 'mouse'),
+      '(any-hover: hover)'
+    ).matches
+  ).toBe(true);
+
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse'), '(hover: none)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse'), '(hover: hover)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse'), '(any-hover: none)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse'), '(any-hover: hover)').matches
+  ).toBe(true);
+
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse', 'touchscreen'), '(hover: none)')
+      .matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, 'mouse', 'touchscreen'), '(hover: hover)')
+      .matches
+  ).toBe(true);
+  expect(
+    matchMedia(
+      screenSized(100, 100, 'mouse', 'touchscreen'),
+      '(any-hover: none)'
+    ).matches
+  ).toBe(false);
+  expect(
+    matchMedia(
+      screenSized(100, 100, 'mouse', 'touchscreen'),
+      '(any-hover: hover)'
+    ).matches
+  ).toBe(true);
+
+  expect(
+    matchMedia(screenSized(100, 100, undefined), '(hover: none)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, undefined), '(hover: hover)').matches
+  ).toBe(false);
+  expect(
+    matchMedia(screenSized(100, 100, undefined), '(any-hover: none)').matches
+  ).toBe(true);
+  expect(
+    matchMedia(screenSized(100, 100, undefined), '(any-hover: hover)').matches
+  ).toBe(false);
+
+  expect(
     matchMedia(screenSized(481, 100), 'screen and (min-width: 480px)').matches
   ).toBe(true);
   expect(
@@ -363,6 +517,18 @@ test('matchMedia()', () => {
     matchMedia(
       screenSized(481, 100),
       'only screen and (min-width: 480px) and (orientation: landscape)'
+    ).matches
+  ).toBe(true);
+  expect(
+    matchMedia(
+      screenSized(481, 100, "touchscreen"),
+      'only screen and (min-width: 480px) and (orientation: landscape) and (any-hover: hover)'
+    ).matches
+  ).toBe(false);
+  expect(
+    matchMedia(
+      screenSized(481, 100, "touchscreen", "mouse"),
+      'only screen and (min-width: 480px) and (orientation: landscape) and (any-hover: hover)'
     ).matches
   ).toBe(true);
 });
