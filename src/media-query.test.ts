@@ -91,6 +91,7 @@ class ParsedMinWidth {
   static *Parser() {
     yield optionalWhitespace;
     yield '(';
+    yield optionalWhitespace;
     yield 'min-width:';
     yield optionalWhitespace;
     const value: ParsedType<typeof ParseInt> = yield ParseInt;
@@ -118,6 +119,7 @@ class ParsedOrientation {
   static *Parser() {
     yield optionalWhitespace;
     yield '(';
+    yield optionalWhitespace;
     yield 'orientation:';
     yield optionalWhitespace;
     const orientation: 'portrait' | 'landscape' = yield [
@@ -211,7 +213,6 @@ class ParsedMediaCondition {
   static *Parser() {
     yield optionalWhitespace;
     const first: ParsedMediaInParens = yield parsedMediaInParens;
-    // const conditions: ParsedMediaAnds | undefined = yield optional(ParsedMediaAnds.Parser);
     const conditions: ParsedMediaAnds | '' = yield [ParsedMediaAnds.Parser, ''];
     if (conditions === '') {
       return first;
