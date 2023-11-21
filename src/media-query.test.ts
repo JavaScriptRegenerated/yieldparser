@@ -35,8 +35,8 @@ class ParsedMediaType {
   constructor(public readonly mediaType: 'screen' | 'print' | 'all') {}
 
   matches(context: { mediaType: 'screen' | 'print' }) {
-    if (this.mediaType === "all") return true;
-    return (this.mediaType === context.mediaType);
+    if (this.mediaType === 'all') return true;
+    return this.mediaType === context.mediaType;
   }
 
   static *Parser() {
@@ -46,24 +46,35 @@ class ParsedMediaType {
   }
 }
 
-function* ParseMinWidth() {
-  yield optionalWhitespace;
-  yield '(';
-  yield 'min-width:';
-  yield optionalWhitespace;
-  const value: ParsedType<typeof ParseInt> = yield ParseInt;
-  const unit = yield ['px', 'em', 'rem'];
-  yield optionalWhitespace;
-  yield ')';
-  return { minWidth: value };
+class ParsedMinWidth {
+  constructor(
+    public readonly value: number,
+    public readonly unit: 'px' | 'em' | 'rem'
+  ) {}
+
+  matches(context: { viewportWidth: number }) {
+    if (this.unit !== 'px') throw Error('Only supports px for now.');
+
+    return this.value <= context.viewportWidth;
+  }
+
+  static *Parser() {
+    yield optionalWhitespace;
+    yield '(';
+    yield 'min-width:';
+    yield optionalWhitespace;
+    const value: ParsedType<typeof ParseInt> = yield ParseInt;
+    const unit = yield ['px', 'em', 'rem'];
+    yield optionalWhitespace;
+    yield ')';
+    return new ParsedMinWidth(value, unit);
+  }
 }
 
 function* ParseMediaQuery() {
-  type Result =
-    | ParsedMediaType
-    | ParsedType<typeof ParseMinWidth>;
+  type Result = ParsedMediaType | ParsedMinWidth;
 
-  const result: Result = yield [ParsedMediaType.Parser, ParseMinWidth];
+  const result: Result = yield [ParsedMediaType.Parser, ParsedMinWidth.Parser];
   yield mustEnd;
   return result;
 }
@@ -86,8 +97,11 @@ function matchMedia(context: MatchMediaContext, mediaQuery: string) {
   if (parsed.result instanceof ParsedMediaType) {
     matches = matches || parsed.result.matches(context);
   }
-  if ('minWidth' in parsed.result) {
-    matches = matches || parsed.result.minWidth <= context.viewportWidth;
+  if (
+    'matches' in parsed.result &&
+    typeof parsed.result.matches === 'function'
+  ) {
+    matches = matches || parsed.result.matches(context);
   }
 
   return {
@@ -99,10 +113,12 @@ test('min-width: 480px', () => {
   const result = parse('(min-width: 480px)', ParseMediaQuery() as any);
   expect(result).toEqual({
     success: true,
-    result: { minWidth: 480 },
+    result: new ParsedMinWidth(480, 'px'),
     remaining: '',
   });
+});
 
+test('matchMedia()', () => {
   const screen = { mediaType: 'screen' } as const;
   const print = { mediaType: 'print' } as const;
 
