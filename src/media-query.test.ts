@@ -507,27 +507,27 @@ test('matchMedia()', () => {
   ).toBe(false);
 
   expect(
-    matchMedia(screenSized(481, 100), 'screen and (min-width: 480px)').matches
+    matchMedia(screenSized(480, 100), 'screen and (min-width: 480px)').matches
   ).toBe(true);
   expect(
-    matchMedia(screenSized(481, 100), 'only screen and (min-width: 480px)')
+    matchMedia(screenSized(480, 100), 'only screen and (min-width: 480px)')
       .matches
   ).toBe(true);
   expect(
     matchMedia(
-      screenSized(481, 100),
+      screenSized(480, 100),
       'only screen and (min-width: 480px) and (orientation: landscape)'
     ).matches
   ).toBe(true);
   expect(
     matchMedia(
-      screenSized(481, 100, "touchscreen"),
+      screenSized(480, 100, "touchscreen"),
       'only screen and (min-width: 480px) and (orientation: landscape) and (any-hover: hover)'
     ).matches
   ).toBe(false);
   expect(
     matchMedia(
-      screenSized(481, 100, "touchscreen", "mouse"),
+      screenSized(480, 100, "touchscreen", "mouse"),
       'only screen and (min-width: 480px) and (orientation: landscape) and (any-hover: hover)'
     ).matches
   ).toBe(true);
