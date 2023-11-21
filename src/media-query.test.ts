@@ -173,9 +173,7 @@ class ParsedMediaAnds {
     const list: Array<ParsedMediaInParens> = [];
 
     do {
-      console.log('and requiredWhitespace 1');
       yield requiredWhitespace;
-      console.log('and requiredWhitespace 2');
       yield 'and';
       yield requiredWhitespace;
       list.push(yield parsedMediaInParens);
@@ -362,7 +360,9 @@ test('matchMedia()', () => {
       .matches
   ).toBe(true);
   expect(
-    matchMedia(screenSized(481, 100), 'only screen and (min-width: 480px) and (orientation: landscape)')
-      .matches
+    matchMedia(
+      screenSized(481, 100),
+      'only screen and (min-width: 480px) and (orientation: landscape)'
+    ).matches
   ).toBe(true);
 });
