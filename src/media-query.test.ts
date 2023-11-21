@@ -78,6 +78,9 @@ class ParsedNotMediaType {
   }
 }
 
+/**
+ * https://www.w3.org/TR/mediaqueries-5/#width
+ */
 class ParsedMinWidth {
   constructor(
     public readonly value: number,
@@ -104,7 +107,7 @@ class ParsedMinWidth {
     yield optionalWhitespace;
     yield 'min-width:';
     yield optionalWhitespace;
-    const value: ParsedType<typeof ParseInt> = yield ParseInt;
+    const value: number = yield ParseInt;
     const unit = yield ['px', 'em', 'rem'];
     yield optionalWhitespace;
     yield ')';
@@ -113,7 +116,7 @@ class ParsedMinWidth {
 }
 
 /**
- https://www.w3.org/TR/mediaqueries-5/#orientation
+ * https://www.w3.org/TR/mediaqueries-5/#orientation
  */
 class ParsedOrientation {
   constructor(public readonly orientation: 'portrait' | 'landscape') {}
@@ -185,6 +188,7 @@ class ParsedHover {
   static *Parser() {
     yield optionalWhitespace;
     yield '(';
+    yield optionalWhitespace;
     const any: boolean = yield has('any-');
     yield 'hover:';
     yield optionalWhitespace;
