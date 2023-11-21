@@ -212,13 +212,15 @@ type ParsedMediaInParens = ParsedMediaFeature;
 class ParsedMediaCondition {
   constructor(
     public readonly first: ParsedMediaFeature,
-    public readonly conditions?: ParsedMediaAnds
+    public readonly conditions?: ParsedMediaAnds | ParsedMediaOrs
   ) {}
 
   matches(context: MatchMediaContext) {
     const base = this.first.matches(context);
-    if (this.conditions) {
+    if (this.conditions instanceof ParsedMediaAnds) {
       return base && this.conditions.matches(context);
+    } else if (this.conditions instanceof ParsedMediaOrs) {
+      return base || this.conditions.matches(context);
     } else {
       return base;
     }
@@ -227,7 +229,11 @@ class ParsedMediaCondition {
   static *Parser() {
     yield optionalWhitespace;
     const first: ParsedMediaInParens = yield parsedMediaInParens;
-    const conditions: ParsedMediaAnds | '' = yield [ParsedMediaAnds.Parser, ''];
+    const conditions: ParsedMediaAnds | ParsedMediaOrs | '' = yield [
+      ParsedMediaAnds.Parser,
+      ParsedMediaOrs.Parser,
+      '',
+    ];
     if (conditions === '') {
       return first;
     } else {
@@ -254,6 +260,27 @@ class ParsedMediaAnds {
     } while (yield hasMore);
 
     return new ParsedMediaAnds(list);
+  }
+}
+
+class ParsedMediaOrs {
+  constructor(public readonly list: ReadonlyArray<ParsedMediaInParens>) {}
+
+  matches(context: MatchMediaContext) {
+    return this.list.some((m) => m.matches(context));
+  }
+
+  static *Parser() {
+    const list: Array<ParsedMediaInParens> = [];
+
+    do {
+      yield requiredWhitespace;
+      yield 'or';
+      yield requiredWhitespace;
+      list.push(yield parsedMediaInParens);
+    } while (yield hasMore);
+
+    return new ParsedMediaOrs(list);
   }
 }
 
@@ -622,6 +649,13 @@ test('matchMedia()', () => {
     matchMedia(
       screenSized(480, 100, 'touchscreen', 'mouse'),
       'not print and (min-width: 480px) and (orientation: landscape) and (any-hover: hover)'
+    ).matches
+  ).toBe(true);
+
+  expect(
+    matchMedia(
+      screenSized(480, 100),
+      '(orientation: landscape) or (orientation: portrait)'
     ).matches
   ).toBe(true);
 });
