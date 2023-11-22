@@ -8,9 +8,9 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "browser": "./dist/yieldmachine.module.js",
-      "import": "./dist/yieldmachine.module.js",
-      "require": "./dist/yieldmachine.js"
+      "browser": "./dist/yieldparser.module.js",
+      "import": "./dist/yieldparser.module.js",
+      "require": "./dist/yieldparser.js"
     }
   },
   "targets": {
