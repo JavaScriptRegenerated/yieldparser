@@ -406,7 +406,7 @@ class ParsedMediaQuery {
 }
 
 function matchMedia(context: MatchMediaContext, mediaQuery: string) {
-  const parsed: ParseResult<ParsedMediaQuery> = parse(
+  const parsed: ParseResult<ParsedMediaQuery["main"]> = parse(
     mediaQuery,
     ParsedMediaQuery.Parser() as any
   );
