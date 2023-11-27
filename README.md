@@ -16,15 +16,27 @@ npm add yieldparser
 
 ## Overview
 
-Yieldparser parses a source chunk-by-chunk. You define a generator function that yields each chunk to be found. This chunk can be a `string`, a `RexExp`, or another generator function. Your generator function receives replies from parsing that chunk, for example a regular expression would receive a reply with the matches that were found. You then use this information to build a result: the value that your generator function returns. This could be a simple value, or it could be an entire AST (abstract syntax tree).
+Yieldparser parses a source chunk-by-chunk. You define a generator function that
+yields each chunk to be found. This chunk can be a `string`, a `RexExp`, or
+another generator function. Your generator function receives replies from
+parsing that chunk, for example a regular expression would receive a reply with
+the matches that were found. You then use this information to build a result:
+the value that your generator function returns. This could be a simple value, or
+it could be an entire AST (abstract syntax tree).
 
-If you yield an array of choices, then each choice is tested and the first one that matches is used.
+If you yield an array of choices, then each choice is tested and the first one
+that matches is used.
 
-If your chunks don’t match the input string, then an error result is returned with the remaining string and the chunk that it failed on. If it succeeds, then a success result is returned with the return value of the generator function, and the remaining string (if there is anything remaining).
+If your chunks don’t match the input string, then an error result is returned
+with the remaining string and the chunk that it failed on. If it succeeds, then
+a success result is returned with the return value of the generator function,
+and the remaining string (if there is anything remaining).
 
-Run `parse(input, yourGeneratorIterable)` to take an input string and parse into a result.
+Run `parse(input, yourGeneratorIterable)` to take an input string and parse into
+a result.
 
-Run `invert(output, yourGeneratorIterable)` to take an expected result and map it back to a source string.
+Run `invert(output, yourGeneratorIterable)` to take an expected result and map
+it back to a source string.
 
 ## Examples
 
@@ -41,12 +53,13 @@ Run `invert(output, yourGeneratorIterable)` to take an expected result and map i
 
 ### Routes parser
 
-Define a generator function for each route you have, and then define a top level `Routes` generator function. Then parse your path using `parse()`.
+Define a generator function for each route you have, and then define a top level
+`Routes` generator function. Then parse your path using `parse()`.
 
 You can also map from a route object back to a path string using `invert()`.
 
 ```typescript
-import { parse, mustEnd, invert } from "yieldparser";
+import { invert, mustEnd, parse } from "yieldparser";
 
 type Route =
   | { type: "home" }
@@ -99,23 +112,23 @@ function* Routes() {
   return yield [Home, About, Terms, BlogRoutes];
 }
 
-parse("/", Routes()) // result: { type: "home" }, success: true, remaining: "" }
-parse("/about", Routes()) // result: { type: "about" }, success: true, remaining: "" }
-parse("/legal/terms", Routes()) // result: { type: "terms" }, success: true, remaining: "" }
-parse("/blog", Routes()) // result: { type: "blog" }, success: true, remaining: "" }
-parse("/blog/happy-new-year", Routes()) // result: { type: "blogArticle", slug: "happy-new-year" }, success: true, remaining: "" }
+parse("/", Routes()); // result: { type: "home" }, success: true, remaining: "" }
+parse("/about", Routes()); // result: { type: "about" }, success: true, remaining: "" }
+parse("/legal/terms", Routes()); // result: { type: "terms" }, success: true, remaining: "" }
+parse("/blog", Routes()); // result: { type: "blog" }, success: true, remaining: "" }
+parse("/blog/happy-new-year", Routes()); // result: { type: "blogArticle", slug: "happy-new-year" }, success: true, remaining: "" }
 
-invert({ type: "home" }, Routes()) // "/"
-invert({ type: "about" }, Routes()) // "/about"
-invert({ type: "terms" }, Routes()) // "/legal/terms"
-invert({ type: "blog" }, Routes()) // "/blog"
-invert({ type: "blogArticle", slug: "happy-new-year" }, Routes()) // "/blog/happy-new-year"
+invert({ type: "home" }, Routes()); // "/"
+invert({ type: "about" }, Routes()); // "/about"
+invert({ type: "terms" }, Routes()); // "/legal/terms"
+invert({ type: "blog" }, Routes()); // "/blog"
+invert({ type: "blogArticle", slug: "happy-new-year" }, Routes()); // "/blog/happy-new-year"
 ```
 
 ### IP Address parser
 
 ```typescript
-import { parse, mustEnd } from 'yieldparser';
+import { mustEnd, parse } from "yieldparser";
 
 function* Digit() {
   const [digit]: [string] = yield /^\d+/;
@@ -128,17 +141,17 @@ function* Digit() {
 
 function* IPAddress() {
   const first = yield Digit;
-  yield '.';
+  yield ".";
   const second = yield Digit;
-  yield '.';
+  yield ".";
   const third = yield Digit;
-  yield '.';
+  yield ".";
   const fourth = yield Digit;
   yield mustEnd;
   return [first, second, third, fourth];
 }
 
-parse('1.2.3.4', IPAddress());
+parse("1.2.3.4", IPAddress());
 /*
 {
   success: true,
@@ -147,7 +160,7 @@ parse('1.2.3.4', IPAddress());
 }
 */
 
-parse('1.2.3.256', IPAddress());
+parse("1.2.3.256", IPAddress());
 /*
 {
   success: false,
@@ -166,7 +179,7 @@ parse('1.2.3.256', IPAddress());
 ### Basic CSS parser
 
 ```typescript
-import { parse, hasMore, has } from 'yieldparser';
+import { has, hasMore, parse } from "yieldparser";
 
 type Selector = string;
 interface Declaraction {
@@ -193,11 +206,11 @@ function* ValueParser() {
 function* DeclarationParser() {
   const name = yield PropertyParser;
   yield whitespaceMay;
-  yield ':';
+  yield ":";
   yield whitespaceMay;
   const rawValue = yield ValueParser;
   yield whitespaceMay;
-  yield ';';
+  yield ";";
   return { name, rawValue };
 }
 
@@ -207,9 +220,9 @@ function* RuleParser() {
   const [selector]: [string] = yield /(:root|[*]|[a-z][\w]*)/;
 
   yield whitespaceMay;
-  yield '{';
+  yield "{";
   yield whitespaceMay;
-  while ((yield has('}')) === false) {
+  while ((yield has("}")) === false) {
     yield whitespaceMay;
     declarations.push(yield DeclarationParser);
     yield whitespaceMay;

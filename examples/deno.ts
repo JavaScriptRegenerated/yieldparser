@@ -1,5 +1,5 @@
 // import { parse, mustEnd } from 'https://unpkg.com/yieldparser@0.4.0?module';
-import { parse, mustEnd } from '../src/index.ts';
+import { mustEnd, parse } from "../src/index.ts";
 
 function* Digit() {
   const [digit]: [string] = yield /^\d+/;
@@ -12,15 +12,15 @@ function* Digit() {
 
 function* IPAddress() {
   const first = yield Digit;
-  yield '.';
+  yield ".";
   const second = yield Digit;
-  yield '.';
+  yield ".";
   const third = yield Digit;
-  yield '.';
+  yield ".";
   const fourth = yield Digit;
   yield mustEnd;
   return [first, second, third, fourth];
 }
 
-console.log(parse('1.2.3.4', IPAddress()));
-console.log(parse('1.2.3.256', IPAddress()));
+console.log(parse("1.2.3.4", IPAddress()));
+console.log(parse("1.2.3.256", IPAddress()));

@@ -1,276 +1,279 @@
-import { parse, hasMore, mustEnd, has } from './index';
-import type { ParseGenerator } from './index';
+import { describe, expect, it } from "./test-deps.ts";
+import { has, hasMore, mustEnd, parse } from "./index.ts";
+import type { ParsedType, ParseGenerator } from "./index.ts";
 
-describe('parse()', () => {
-  describe('failing', () => {
-    test('array of wrong substrings', () => {
-      expect(parse('abcdef', ['abc', 'wrong'])).toEqual({
-        remaining: 'def',
+const test = Deno.test;
+
+describe("parse()", () => {
+  describe("failing", () => {
+    test("array of wrong substrings", () => {
+      expect(parse("abcdef", ["abc", "wrong"])).toEqual({
+        remaining: "def",
         success: false,
-        failedOn: { iterationCount: 1, yielded: 'wrong' },
+        failedOn: { iterationCount: 1, yielded: "wrong" },
       });
     });
 
-    test('yielding string after start', () => {
+    test("yielding string after start", () => {
       expect(
         parse(
-          'abc',
+          "abc",
           (function* () {
-            yield 'bc';
-          })()
-        )
+            yield "bc";
+          })(),
+        ),
       ).toEqual({
         success: false,
-        remaining: 'abc',
-        failedOn: { iterationCount: 0, yielded: 'bc' },
+        remaining: "abc",
+        failedOn: { iterationCount: 0, yielded: "bc" },
       });
     });
 
-    test('yielding wrong string', () => {
+    test("yielding wrong string", () => {
       expect(
         parse(
-          'abcDEF',
+          "abcDEF",
           (function* () {
-            yield 'abc';
-            yield 'def';
-          })()
-        )
+            yield "abc";
+            yield "def";
+          })(),
+        ),
       ).toEqual({
         success: false,
-        remaining: 'DEF',
-        failedOn: { iterationCount: 1, yielded: 'def' },
+        remaining: "DEF",
+        failedOn: { iterationCount: 1, yielded: "def" },
       });
     });
   });
 
-  describe('succeeding iterables', () => {
-    it('accepts substrings', () => {
-      expect(parse('abcdef', ['abc', 'def'])).toEqual({
-        remaining: '',
+  describe("succeeding iterables", () => {
+    it("accepts substrings", () => {
+      expect(parse("abcdef", ["abc", "def"])).toEqual({
+        remaining: "",
         success: true,
       });
     });
 
-    it('accepts array of substrings', () => {
-      expect(parse('abcdef', [['123', 'abc'], 'def'])).toEqual({
-        remaining: '',
+    it("accepts array of substrings", () => {
+      expect(parse("abcdef", [["123", "abc"], "def"])).toEqual({
+        remaining: "",
         success: true,
       });
     });
 
-    it('only replaces first match', () => {
-      expect(parse('abc123abc', ['abc', '123', 'abc'])).toEqual({
-        remaining: '',
+    it("only replaces first match", () => {
+      expect(parse("abc123abc", ["abc", "123", "abc"])).toEqual({
+        remaining: "",
         success: true,
       });
     });
   });
 
-  describe('succeeding generator functions', () => {
-    it('accepts substrings', () => {
+  describe("succeeding generator functions", () => {
+    it("accepts substrings", () => {
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
-            yield 'abc';
-            yield 'def';
-          })()
-        )
+            yield "abc";
+            yield "def";
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
       });
     });
 
-    it('accepts empty string', () => {
+    it("accepts empty string", () => {
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
-            yield '';
-            yield 'abc';
-            yield '';
-            yield 'def';
-            yield '';
-          })()
-        )
+            yield "";
+            yield "abc";
+            yield "";
+            yield "def";
+            yield "";
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
       });
     });
 
-    it('accepts array of substrings', () => {
+    it("accepts array of substrings", () => {
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
-            const found: string = yield ['abc', '123'];
-            yield 'def';
+            const found: string = yield ["abc", "123"];
+            yield "def";
             return { found };
-          })()
-        )
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
         result: {
-          found: 'abc',
+          found: "abc",
         },
       });
     });
 
-    it('accepts array of substrings', () => {
+    it("accepts array of substrings", () => {
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
-            const found: string = yield ['123', 'abc'];
-            yield 'def';
+            const found: string = yield ["123", "abc"];
+            yield "def";
             return { found };
-          })()
-        )
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
         result: {
-          found: 'abc',
+          found: "abc",
         },
       });
     });
 
-    it('accepts Set of substrings', () => {
+    it("accepts Set of substrings", () => {
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
-            const found: string = yield new Set(['123', 'abc']);
-            yield 'def';
+            const found: string = yield new Set(["123", "abc"]);
+            yield "def";
             return { found };
-          })()
-        )
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
         result: {
-          found: 'abc',
+          found: "abc",
         },
       });
     });
-    it('accepts Set of substrings', () => {
+    it("accepts Set of substrings", () => {
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
-            const found: string = yield 'abc';
-            yield 'def';
+            const found: string = yield "abc";
+            yield "def";
             return { found };
-          })()
-        )
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
         result: {
-          found: 'abc',
+          found: "abc",
         },
       });
     });
 
-    it('accepts regex', () => {
+    it("accepts regex", () => {
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
             yield /^abc/;
             yield /^def$/;
-          })()
-        )
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
       });
     });
 
-    it('accepts newlines as string and regex', () => {
+    it("accepts newlines as string and regex", () => {
       expect(
         parse(
-          '\n\n',
+          "\n\n",
           (function* () {
-            yield '\n';
+            yield "\n";
             yield /^\n/;
-          })()
-        )
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
       });
     });
 
-    it('yields result from regex', () => {
+    it("yields result from regex", () => {
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
             const [found1]: [string] = yield /^abc/;
             const [found2]: [string] = yield /^def/;
             return { found1, found2 };
-          })()
-        )
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
         result: {
-          found1: 'abc',
-          found2: 'def',
+          found1: "abc",
+          found2: "def",
         },
       });
     });
 
-    it('accepts regex with capture groups', () => {
+    it("accepts regex with capture groups", () => {
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
             const [whole, first, second]: [
               string,
               string,
-              string
+              string,
             ] = yield /^a(b)(c)/;
             const [found2]: [string] = yield /^def/;
             return { whole, first, second, found2 };
-          })()
-        )
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
         result: {
-          whole: 'abc',
-          first: 'b',
-          second: 'c',
-          found2: 'def',
+          whole: "abc",
+          first: "b",
+          second: "c",
+          found2: "def",
         },
       });
     });
 
-    it('accepts yield delegating to other generator function', () => {
+    it("accepts yield delegating to other generator function", () => {
       function* BCD() {
-        yield 'b';
-        yield 'c';
-        yield 'd';
+        yield "b";
+        yield "c";
+        yield "d";
         return { bcd: true };
       }
 
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
-            yield 'a';
+            yield "a";
             const result = yield* BCD();
-            yield 'ef';
+            yield "ef";
             return result;
-          })()
-        )
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
         result: {
           bcd: true,
@@ -278,33 +281,33 @@ describe('parse()', () => {
       });
     });
 
-    it('accepts yielding array of other generator functions', () => {
+    it("accepts yielding array of other generator functions", () => {
       function* BCD() {
-        yield 'b';
-        yield 'c';
-        yield 'd';
+        yield "b";
+        yield "c";
+        yield "d";
         return { bcd: true };
       }
 
       function* BAD() {
-        yield 'b';
-        yield 'a';
-        yield 'd';
+        yield "b";
+        yield "a";
+        yield "d";
         return { bad: true };
       }
 
       expect(
         parse(
-          'abcdef',
+          "abcdef",
           (function* () {
-            yield 'a';
+            yield "a";
             const result = yield [BAD, BCD];
-            yield 'ef';
+            yield "ef";
             return result;
-          })()
-        )
+          })(),
+        ),
       ).toEqual({
-        remaining: '',
+        remaining: "",
         success: true,
         result: {
           bcd: true,
@@ -313,7 +316,7 @@ describe('parse()', () => {
     });
   });
 
-  describe('IP Address', () => {
+  describe("IP Address", () => {
     function* Digit() {
       const [digit]: [string] = yield /^\d+/;
       const value = parseInt(digit, 10);
@@ -324,55 +327,49 @@ describe('parse()', () => {
     }
 
     function* IPAddress() {
-      const first = yield Digit;
-      yield '.';
-      const second = yield Digit;
-      yield '.';
-      const third = yield Digit;
-      yield '.';
-      const fourth = yield Digit;
+      const first: number = yield Digit;
+      yield ".";
+      const second: number = yield Digit;
+      yield ".";
+      const third: number = yield Digit;
+      yield ".";
+      const fourth: number = yield Digit;
       yield mustEnd;
       return [first, second, third, fourth];
     }
 
-    it('accepts valid IP addresses', () => {
-      expect(parse('1.2.3.4', IPAddress())).toEqual({
+    it("accepts valid IP addresses", () => {
+      expect(parse("1.2.3.4", IPAddress())).toEqual({
         success: true,
         result: [1, 2, 3, 4],
-        remaining: '',
+        remaining: "",
       });
 
-      expect(parse('255.255.255.255', IPAddress())).toEqual({
+      expect(parse("255.255.255.255", IPAddress())).toEqual({
         success: true,
         result: [255, 255, 255, 255],
-        remaining: '',
+        remaining: "",
       });
     });
 
-    it('rejects invalid IP addresses', () => {
-      expect(parse('1.2.3.256', IPAddress())).toEqual({
-        success: false,
-        failedOn: expect.objectContaining({
-          nested: [
-            expect.objectContaining({
-              yielded: new Error('Digit must be between 0 and 255, was 256'),
-            }),
-          ],
-        }),
-        remaining: '256',
-      });
+    it("rejects invalid 1.2.3.256", () => {
+      const result = parse("1.2.3.256", IPAddress());
+      expect(result.success).toBe(false);
+      expect(result.remaining).toBe("256");
+      expect((result as any).failedOn.nested.yield).toEqual(
+        new Error("Digit must be between 0 and 255, was 256"),
+      );
+    });
 
-      expect(parse('1.2.3.4.5', IPAddress())).toEqual({
-        success: false,
-        failedOn: expect.objectContaining({
-          yielded: mustEnd,
-        }),
-        remaining: '.5',
-      });
+    it("rejects invalid 1.2.3.4.5", () => {
+      const result = parse("1.2.3.4.5", IPAddress());
+      expect(result.success).toBe(false);
+      expect(result.remaining).toBe(".5");
+      expect((result as any).failedOn.nested.yield).toEqual(mustEnd);
     });
   });
 
-  describe('CSS', () => {
+  describe("CSS", () => {
     type Selector = string;
     interface Declaraction {
       property: string;
@@ -396,27 +393,35 @@ describe('parse()', () => {
     }
 
     function* DeclarationParser() {
-      const name = yield PropertyParser;
+      const name: string = yield PropertyParser;
       yield whitespaceMay;
-      yield ':';
+      yield ":";
       yield whitespaceMay;
-      const rawValue = yield ValueParser;
+      const rawValue: string = yield ValueParser;
       yield whitespaceMay;
-      yield ';';
+      yield ";";
       return { name, rawValue };
     }
 
-    function* RuleParser() {
+    function* RuleParser():
+      | Generator<RegExp, Rule, [string] & ReadonlyArray<string>>
+      | Generator<() => ParseGenerator<boolean>, Rule, boolean>
+      | Generator<
+        () => typeof DeclarationParser,
+        Rule,
+        ParsedType<typeof DeclarationParser>
+      >
+      | Generator<unknown, Rule, unknown> {
       const declarations: Array<Declaraction> = [];
 
       const [selector]: [string] = yield /^(:root|[*]|[a-z][\w]*)/;
 
       yield whitespaceMay;
-      yield '{';
+      yield "{";
       yield whitespaceMay;
-      while ((yield has('}')) === false) {
+      while ((yield has("}")) === false) {
         yield whitespaceMay;
-        declarations.push(yield DeclarationParser);
+        declarations.push((yield DeclarationParser) as unknown as Declaraction);
         yield whitespaceMay;
       }
 
@@ -450,47 +455,47 @@ describe('parse()', () => {
     }
     `;
 
-    it('parses', () => {
+    it("parses", () => {
       expect(parse(code, RulesParser())).toEqual({
         success: true,
         result: [
           {
-            selectors: [':root'],
+            selectors: [":root"],
             declarations: [
               {
-                name: '--first-var',
-                rawValue: '42rem',
+                name: "--first-var",
+                rawValue: "42rem",
               },
               {
-                name: '--second-var',
-                rawValue: '15%',
+                name: "--second-var",
+                rawValue: "15%",
               },
             ],
           },
           {
-            selectors: ['*'],
+            selectors: ["*"],
             declarations: [
               {
-                name: 'font',
-                rawValue: 'inherit',
+                name: "font",
+                rawValue: "inherit",
               },
               {
-                name: 'box-sizing',
-                rawValue: 'border-box',
+                name: "box-sizing",
+                rawValue: "border-box",
               },
             ],
           },
           {
-            selectors: ['h1'],
+            selectors: ["h1"],
             declarations: [
               {
-                name: 'margin-bottom',
-                rawValue: '1em',
+                name: "margin-bottom",
+                rawValue: "1em",
               },
             ],
           },
         ],
-        remaining: '',
+        remaining: "",
       });
     });
   });

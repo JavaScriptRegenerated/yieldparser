@@ -1,4 +1,5 @@
-import { invert, mustEnd, parse } from "./index";
+import { describe, expect, it } from "./test-deps.ts";
+import { invert, mustEnd, parse } from "./index.ts";
 
 describe("Router", () => {
   type Route =
@@ -160,11 +161,15 @@ describe("Router inversion", () => {
   });
 
   it("works with single route definition with param", () => {
-    expect(invert({ type: "album", id: "123" }, AlbumItem())).toEqual("/albums/123");
-    expect(invert({ type: "album", id: "678" }, AlbumItem())).toEqual("/albums/678");
+    expect(invert({ type: "album", id: "123" }, AlbumItem())).toEqual(
+      "/albums/123",
+    );
+    expect(invert({ type: "album", id: "678" }, AlbumItem())).toEqual(
+      "/albums/678",
+    );
     expect(invert({ type: "album", id: "abc" }, AlbumItem())).toBeNull();
     expect(invert({ type: "BLAH", id: "123" }, AlbumItem())).toBeNull();
-  })
+  });
 
   it("works with nested routes", () => {
     expect(invert({ type: "home" }, Routes())).toEqual("/");
@@ -175,17 +180,20 @@ describe("Router inversion", () => {
 
   it("works with routes with nested prefix", () => {
     expect(invert({ type: "blog" }, BlogHome())).toEqual("/blog");
-    expect(invert({ type: "blogArticle", slug: "hello-world" }, BlogArticle())).toEqual("/blog/hello-world");
+    expect(invert({ type: "blogArticle", slug: "hello-world" }, BlogArticle()))
+      .toEqual("/blog/hello-world");
 
     expect(invert({ type: "blog" }, BlogRoutes())).toEqual("/blog");
-    expect(invert({ type: "blogArticle", slug: "hello-world" }, BlogRoutes())).toEqual("/blog/hello-world");
+    expect(invert({ type: "blogArticle", slug: "hello-world" }, BlogRoutes()))
+      .toEqual("/blog/hello-world");
     expect(invert({ type: "BLAH" }, BlogRoutes())).toBeNull();
   });
 
   it("all works with double nested routes", () => {
     expect(invert({ type: "home" }, DoubleNested())).toEqual("/");
     expect(invert({ type: "blog" }, DoubleNested())).toEqual("/blog");
-    expect(invert({ type: "blogArticle", slug: "hello-world" }, DoubleNested())).toEqual("/blog/hello-world");
+    expect(invert({ type: "blogArticle", slug: "hello-world" }, DoubleNested()))
+      .toEqual("/blog/hello-world");
     expect(invert({ type: "BLAH" }, DoubleNested())).toBeNull();
   });
 });

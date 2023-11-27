@@ -1,34 +1,34 @@
 // https://www.w3.org/TR/mediaqueries-5/
+import { afterEach, beforeEach, describe, expect, it } from './test-deps.ts';
 import {
-  has,
-  hasMore,
   mustEnd,
   optional,
   parse,
+  ParsedType,
   ParseGenerator,
   ParseResult,
   ParseYieldable,
-} from './index';
+} from './index.ts';
 
 const optionalWhitespace = /^\s*/;
 const requiredWhitespace = /^\s+/;
 
-type ParsedType<A> = A extends { Parser: () => Generator }
-  ? ParsedTypeForClass<A>
-  : A extends (...args: unknown[]) => unknown
-  ? ParsedTypeForFunction<A>
-  : never;
-type ParsedTypeForFunction<F extends (...args: unknown[]) => unknown> =
-  ReturnType<F> extends Generator<unknown, infer Y> ? Y : never;
-type ParsedTypeForClass<C extends { Parser: () => Generator }> = ReturnType<
-  C['Parser']
-> extends Generator<unknown, infer Y>
-  ? Y
-  : never;
+export function has(prefix: string | RegExp): () => ParserGenerator<boolean> {
+  return function* (): ParserGenerator<boolean> {
+    const [match] = yield [prefix, ''];
+    return match !== '';
+  };
+}
 
-function* ParseInt() {
-  const isNegative: boolean = yield has('-');
-  const [stringValue]: [string] = yield /^\d+/;
+export function* hasMore(): ParserGenerator<boolean> {
+  const { index }: { index: number } = yield /$/;
+  return index > 0;
+  // return !(yield isEnd);
+}
+
+function* ParseInt(): ParserGenerator<number> {
+  const isNegative = Boolean(yield has('-'));
+  const [stringValue] = yield /^\d+/;
   return parseInt(stringValue, 10) * (isNegative ? -1 : 1);
 }
 
@@ -50,11 +50,11 @@ class ParsedMediaType {
     return this.mediaType === context.mediaType;
   }
 
-  static *Parser() {
+  static *Parser(): ParserGenerator<ParsedMediaType> {
     yield optionalWhitespace;
-    yield optional(() => ['only', requiredWhitespace]);
-    const mediaType: ParsedMediaType['mediaType'] = yield ['screen', 'print'];
-    return new ParsedMediaType(mediaType);
+    yield /^only\s+/;
+    const [mediaType] = yield ['screen', 'print'];
+    return new ParsedMediaType(mediaType as 'screen' | 'print');
   }
 }
 
@@ -66,15 +66,12 @@ class ParsedNotMediaType {
     return this.mediaType !== context.mediaType;
   }
 
-  static *Parser() {
+  static *Parser(): ParserGenerator<ParsedNotMediaType> {
     yield optionalWhitespace;
     yield 'not';
     yield requiredWhitespace;
-    const mediaType: ParsedNotMediaType['mediaType'] = yield [
-      'screen',
-      'print',
-    ];
-    return new ParsedNotMediaType(mediaType);
+    const [mediaType] = yield ['screen', 'print'];
+    return new ParsedNotMediaType(mediaType as ParsedNotMediaType['mediaType']);
   }
 }
 
@@ -101,17 +98,17 @@ class ParsedMinWidth {
     return this.valueInPx(context) <= context.viewportWidth;
   }
 
-  static *Parser() {
+  static *Parser(): ParserGenerator<ParsedMinWidth, number> {
     yield optionalWhitespace;
     yield '(';
     yield optionalWhitespace;
     yield 'min-width:';
     yield optionalWhitespace;
-    const value: number = yield ParseInt;
-    const unit = yield ['px', 'em', 'rem'];
+    const { value } = yield ParseInt;
+    const [unit] = yield ['px', 'em', 'rem'];
     yield optionalWhitespace;
     yield ')';
-    return new ParsedMinWidth(value, unit);
+    return new ParsedMinWidth(value.valueOf(), unit as 'px' | 'em' | 'rem');
   }
 }
 
@@ -129,19 +126,16 @@ class ParsedOrientation {
     return this.orientation === calculated;
   }
 
-  static *Parser() {
+  static *Parser(): ParserGenerator<ParsedOrientation> {
     yield optionalWhitespace;
     yield '(';
     yield optionalWhitespace;
     yield 'orientation:';
     yield optionalWhitespace;
-    const orientation: 'portrait' | 'landscape' = yield [
-      'portrait',
-      'landscape',
-    ];
+    const [orientation] = yield ['portrait', 'landscape'];
     yield optionalWhitespace;
     yield ')';
-    return new ParsedOrientation(orientation);
+    return new ParsedOrientation(orientation as 'portrait' | 'landscape');
   }
 }
 
@@ -164,7 +158,7 @@ const PointerAccuracy = Object.freeze({
     }
   },
 });
-type PointerLevels = typeof PointerAccuracy['none' | 'coarse' | 'fine'];
+type PointerLevels = (typeof PointerAccuracy)['none' | 'coarse' | 'fine'];
 class ParsedPointer {
   constructor(
     public readonly accuracy: 'none' | 'coarse' | 'fine',
@@ -200,17 +194,20 @@ class ParsedPointer {
     return deviceLevel >= minLevel;
   }
 
-  static *Parser() {
+  static *Parser(): ParserGenerator<ParsedPointer> {
     yield optionalWhitespace;
     yield '(';
     yield optionalWhitespace;
-    const any: boolean = yield has('any-');
+    const any = Boolean(yield has('any-'));
     yield 'pointer:';
     yield optionalWhitespace;
-    const hover: 'none' | 'coarse' | 'fine' = yield ['none', 'coarse', 'fine'];
+    const [hover] = yield ['none', 'coarse', 'fine'];
     yield optionalWhitespace;
     yield ')';
-    return new ParsedPointer(hover, any ? 'any' : undefined);
+    return new ParsedPointer(
+      hover as 'none' | 'coarse' | 'fine',
+      any ? 'any' : undefined
+    );
   }
 }
 
@@ -254,17 +251,17 @@ class ParsedHover {
     }
   }
 
-  static *Parser() {
+  static *Parser(): ParserGenerator<ParsedHover> {
     yield optionalWhitespace;
     yield '(';
     yield optionalWhitespace;
-    const any: boolean = yield has('any-');
+    const any = Boolean(yield has('any-'));
     yield 'hover:';
     yield optionalWhitespace;
-    const hover: 'none' | 'hover' = yield ['none', 'hover'];
+    const [hover] = yield ['none', 'hover'];
     yield optionalWhitespace;
     yield ')';
-    return new ParsedHover(hover, any ? 'any' : undefined);
+    return new ParsedHover(hover as 'none' | 'hover', any ? 'any' : undefined);
   }
 }
 
@@ -276,7 +273,12 @@ const parsedMediaFeature = [
   ParsedPointer.Parser,
 ];
 const parsedMediaInParens = [...parsedMediaFeature];
-type ParsedMediaFeature = ParsedType<typeof parsedMediaFeature[-1]>;
+// type ParsedMediaFeature = ParsedType<(typeof parsedMediaFeature)[-1]>;
+type ParsedMediaFeature =
+  | ParsedMinWidth
+  | ParsedOrientation
+  | ParsedHover
+  | ParsedPointer;
 type ParsedMediaInParens = ParsedMediaFeature;
 
 class ParsedMediaCondition {
@@ -312,6 +314,127 @@ class ParsedMediaCondition {
   }
 }
 
+type GetYield<T, Result> = T extends {
+  next(...args: [unknown]): IteratorResult<infer A, Result>;
+}
+  ? A
+  : never;
+
+const internal = Symbol('internal');
+class YieldedValue<T = never, S extends string = string> {
+  constructor(stringValue: string) {
+    this[internal] = stringValue;
+  }
+
+  get value(): T {
+    return this[internal];
+  }
+
+  get index(): number {
+    return 0;
+  }
+
+  *[Symbol.iterator](): IterableIterator<S> {
+    const a: Array<S> = this[internal];
+    yield* a;
+  }
+}
+
+type PrimitiveYield<T, S extends string> =
+  | S
+  | RegExp
+  // | (() => Omit<Generator<unknown, T, unknown>, "next" | "return" | "throw">)
+  // | (() => Omit<Generator<unknown, boolean, unknown>, "next" | "return" | "throw">)
+  | (() => {
+      [Symbol.iterator](): {
+        next: {
+          (result: unknown): IteratorResult<unknown, unknown | boolean>;
+          // (result: unknown): IteratorResult<unknown, boolean>
+        };
+      };
+    })
+  | Array<PrimitiveYield<T, S>>;
+
+type Next<T extends object | number | boolean, Result> = {
+  // next: {
+  //   (s: string): IteratorResult<string, Result>;
+  //   (matches: [string]): IteratorResult<RegExp, Result>;
+  // };
+  next: {
+    // <S extends string = string>(result: YieldedValue<T, S>): IteratorResult<
+    //   PrimitiveYield<T, S> | (() => Generator<unknown, boolean, unknown>),
+    //   Result
+    // >;
+    (result: YieldedValue<T, string>): IteratorResult<
+      typeof result extends YieldedValue<T, infer Z>
+        ? Z extends string
+          ? PrimitiveYield<T, Z>
+          : PrimitiveYield<T, string>
+        : PrimitiveYield<T, string>,
+      Result
+    >;
+    // (result: YieldedValue<T>): IteratorResult<PrimitiveYield<T>, Result>;
+    // <A extends string | [string]>(result: A): A extends string
+    //   ? IteratorResult<string, Result>
+    //   : A extends Iterable<string>
+    //   ? IteratorResult<RegExp, Result>
+    //   : never;
+  };
+};
+// | {
+//     next(
+//       ...args: [boolean]
+//     ): IteratorResult<() => Generator<unknown, boolean>, Result>;
+//   }
+// | {
+//     next(...args: [T]): IteratorResult<() => Generator<unknown, T>, Result>;
+//   }
+// & {
+//     next(s: string): IteratorResult<string, Result>;
+//   }
+// & {
+//     next(matches: [string]): IteratorResult<RegExp, Result>;
+//   }
+// & {
+//     next(): IteratorResult<unknown, Result>;
+//   };
+// type Next<T, Result> = GetYield<T, Result> extends RegExp ? {
+//   next(
+//     ...args: [[string] & ReadonlyArray<string>]
+//   ): IteratorResult<RegExp, Result>;
+// } : GetYield<T, Result> extends string ? {
+//   next(
+//     ...args: [string]
+//   ): IteratorResult<string, Result>;
+// } : never;
+
+// type Next<T> = {
+//   next(
+//     ...args: [[string] & ReadonlyArray<string>]
+//   ): IteratorResult<RegExp, ParsedMediaAnds>;
+//   next(
+//     ...args: [string]
+//   ): IteratorResult<string, ParsedMediaAnds>;
+// };
+// type Next<T> = T extends RegExp ? {
+//     next(
+//       ...args: [[string] & ReadonlyArray<string>]
+//     ): IteratorResult<RegExp, ParsedMediaAnds>;
+//   }
+//   : T extends string ? {
+//       next(
+//         ...args: [string]
+//       ): IteratorResult<string, ParsedMediaAnds>;
+//     }
+//   : never;
+
+type ParserGenerator<
+  Result,
+  NextValue extends object | number | boolean = never
+> = {
+  [Symbol.iterator](): Next<NextValue, Result>;
+};
+
 class ParsedMediaAnds {
   constructor(public readonly list: ReadonlyArray<ParsedMediaInParens>) {}
 
@@ -319,14 +442,15 @@ class ParsedMediaAnds {
     return this.list.every((m) => m.matches(context));
   }
 
-  static *Parser() {
+  static *Parser(): ParserGenerator<ParsedMediaAnds, ParsedMediaInParens> {
     const list: Array<ParsedMediaInParens> = [];
 
     do {
+      const [a, c] = yield requiredWhitespace;
+      const [b] = yield 'and';
       yield requiredWhitespace;
-      yield 'and';
-      yield requiredWhitespace;
-      list.push(yield parsedMediaInParens);
+      const { value: item } = yield parsedMediaInParens;
+      list.push(item);
     } while (yield hasMore);
 
     return new ParsedMediaAnds(list);
@@ -340,14 +464,14 @@ class ParsedMediaOrs {
     return this.list.some((m) => m.matches(context));
   }
 
-  static *Parser() {
+  static *Parser(): ParserGenerator<ParsedMediaOrs, ParsedMediaInParens> {
     const list: Array<ParsedMediaInParens> = [];
 
     do {
       yield requiredWhitespace;
       yield 'or';
       yield requiredWhitespace;
-      list.push(yield parsedMediaInParens);
+      list.push((yield parsedMediaInParens).value);
     } while (yield hasMore);
 
     return new ParsedMediaOrs(list);
@@ -367,22 +491,46 @@ class ParsedMediaTypeThenConditionWithoutOr {
     );
   }
 
-  static *Parser() {
-    const mediaType: ParsedMediaType | ParsedNotMediaType = yield [
+  static *ParserA(): ParserGenerator<
+    | ParsedMediaType
+    | ParsedNotMediaType
+    | ParsedMediaTypeThenConditionWithoutOr,
+    ParsedMediaType | ParsedNotMediaType
+  > {
+    const mediaType = yield [ParsedMediaType.Parser, ParsedNotMediaType.Parser];
+
+    const list: Array<ParsedMediaInParens> = [];
+
+    if (list.length === 0) {
+      return mediaType.value;
+    } else {
+      return new ParsedMediaTypeThenConditionWithoutOr(mediaType.value, list);
+    }
+  }
+
+  static *Parser(): ParserGenerator<
+    | ParsedMediaType
+    | ParsedNotMediaType
+    | ParsedMediaTypeThenConditionWithoutOr,
+    ParsedMediaType | ParsedNotMediaType | ParsedMediaInParens
+  > {
+    const mediaType = (yield [
       ParsedMediaType.Parser,
       ParsedNotMediaType.Parser,
-    ];
+    ]) as YieldedValue<ParsedMediaType | ParsedNotMediaType>;
 
     const list: Array<ParsedMediaInParens> = [];
 
     while (yield has(/^\s+and\s/)) {
-      list.push(yield parsedMediaInParens);
+      list.push(
+        ((yield parsedMediaInParens) as YieldedValue<ParsedMediaInParens>).value
+      );
     }
 
     if (list.length === 0) {
-      return mediaType;
+      return mediaType.value;
     } else {
-      return new ParsedMediaTypeThenConditionWithoutOr(mediaType, list);
+      return new ParsedMediaTypeThenConditionWithoutOr(mediaType.value, list);
     }
   }
 }
@@ -406,7 +554,7 @@ class ParsedMediaQuery {
 }
 
 function matchMedia(context: MatchMediaContext, mediaQuery: string) {
-  const parsed: ParseResult<ParsedMediaQuery["main"]> = parse(
+  const parsed: ParseResult<ParsedMediaQuery['main']> = parse(
     mediaQuery,
     ParsedMediaQuery.Parser() as any
   );
@@ -427,7 +575,7 @@ function matchMedia(context: MatchMediaContext, mediaQuery: string) {
   };
 }
 
-test('screen', () => {
+it('can parse "screen"', () => {
   const result = parse('screen', ParsedMediaQuery.Parser() as any);
   expect(result).toEqual({
     success: true,
@@ -436,7 +584,7 @@ test('screen', () => {
   });
 });
 
-test('(min-width: 480px)', () => {
+it('can parse (min-width: 480px)', () => {
   const result = parse('(min-width: 480px)', ParsedMediaQuery.Parser() as any);
   expect(result).toEqual({
     success: true,
@@ -445,7 +593,7 @@ test('(min-width: 480px)', () => {
   });
 });
 
-test('(orientation: landscape)', () => {
+it('can parse (orientation: landscape)', () => {
   const result = parse(
     '(orientation: landscape)',
     ParsedMediaQuery.Parser() as any
@@ -457,7 +605,7 @@ test('(orientation: landscape)', () => {
   });
 });
 
-test('screen and (min-width: 480px)', () => {
+it('can parse "screen and (min-width: 480px)"', () => {
   const result = parse(
     'screen and (min-width: 480px)',
     ParsedMediaQuery.Parser() as any
@@ -472,7 +620,7 @@ test('screen and (min-width: 480px)', () => {
   });
 });
 
-test('matchMedia()', () => {
+it('can run matchMedia()', () => {
   const defaultRootFontSizePx = 16;
   const viewport = (width: number, height: number, zoom: number = 1) =>
     ({
@@ -632,14 +780,16 @@ test('matchMedia()', () => {
     matchMedia(screenSized(100, 100, 'touchscreen'), '(pointer: fine)').matches
   ).toBe(false);
   expect(
-    matchMedia(screenSized(100, 100, 'touchscreen'), '(any-pointer: none)').matches
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(any-pointer: none)')
+      .matches
   ).toBe(false);
   expect(
     matchMedia(screenSized(100, 100, 'touchscreen'), '(any-pointer: coarse)')
       .matches
   ).toBe(true);
   expect(
-    matchMedia(screenSized(100, 100, 'touchscreen'), '(any-pointer: fine)').matches
+    matchMedia(screenSized(100, 100, 'touchscreen'), '(any-pointer: fine)')
+      .matches
   ).toBe(false);
 
   expect(
@@ -663,14 +813,22 @@ test('matchMedia()', () => {
     ).matches
   ).toBe(true);
   expect(
-    matchMedia(screenSized(100, 100, 'touchscreen', 'mouse'), '(any-pointer: none)').matches
+    matchMedia(
+      screenSized(100, 100, 'touchscreen', 'mouse'),
+      '(any-pointer: none)'
+    ).matches
   ).toBe(false);
   expect(
-    matchMedia(screenSized(100, 100, 'touchscreen', 'mouse'), '(any-pointer: coarse)')
-      .matches
+    matchMedia(
+      screenSized(100, 100, 'touchscreen', 'mouse'),
+      '(any-pointer: coarse)'
+    ).matches
   ).toBe(true);
   expect(
-    matchMedia(screenSized(100, 100, 'touchscreen', 'mouse'), '(any-pointer: fine)').matches
+    matchMedia(
+      screenSized(100, 100, 'touchscreen', 'mouse'),
+      '(any-pointer: fine)'
+    ).matches
   ).toBe(true);
 
   expect(

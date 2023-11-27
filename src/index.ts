@@ -1,8 +1,19 @@
+export type ParsedType<A> = A extends { Parser: () => Generator }
+  ? ParsedTypeForClass<A>
+  : A extends (...args: unknown[]) => unknown ? ParsedTypeForFunction<A>
+  : never;
+type ParsedTypeForFunction<F extends (...args: unknown[]) => unknown> =
+  ReturnType<F> extends Generator<unknown, infer Y> ? Y : never;
+type ParsedTypeForClass<C extends { Parser: () => Generator }> = ReturnType<
+  C["Parser"]
+> extends Generator<unknown, infer Y> ? Y
+  : never;
+
 export type ParseItem<Result = unknown> =
   | string
   | RegExp
   | Iterable<ParseItem>
-  | (() => Generator<ParseItem, Result, any>);
+  | (() => Generator<ParseItem, Result, unknown>);
 export type ParseYieldable<Result = unknown> = ParseItem<Result>;
 
 export interface ParseError {
@@ -13,28 +24,29 @@ export interface ParseError {
 
 export type ParseResult<Result> =
   | {
-      success: false;
-      remaining: string;
-      failedOn: ParseError;
-    }
+    success: false;
+    remaining: string;
+    failedOn: ParseError;
+  }
   | {
-      success: true;
-      remaining: string;
-      result: Result;
-    };
+    success: true;
+    remaining: string;
+    result: Result;
+  };
 
 export type ParseYieldedValue<Input extends ParseItem> = Input extends RegExp
   ? RegExpMatchArray
   : string;
 
 export type ParseGenerator<Result = unknown> =
-  | Generator<ParseItem<any>, Result, string | RegExpMatchArray>
+  | Generator<ParseItem<unknown>, Result, string | RegExpMatchArray>
+  | Generator<ParseItem<unknown>, Result, unknown>
   | Generator<unknown, Result, undefined>
   | Iterable<ParseItem>;
 
 export function parse<Result = void>(
   input: string,
-  iterable: ParseGenerator<Result>
+  iterable: ParseGenerator<Result>,
 ): ParseResult<Result> {
   let lastResult: ParseYieldedValue<ParseItem> | undefined;
 
@@ -67,16 +79,16 @@ export function parse<Result = void>(
 
     const yielded = next.value as ParseItem;
     const choices =
-      typeof yielded !== 'string' && (yielded as any)[Symbol.iterator]
+      typeof yielded !== "string" && (yielded as any)[Symbol.iterator]
         ? (yielded as Iterable<ParseItem>)
         : [yielded];
 
     for (const choice of choices) {
-      if (typeof choice === 'string') {
+      if (typeof choice === "string") {
         let found = false;
         const newInput = input.replace(choice, (_1, offset: number) => {
           found = offset === 0;
-          return '';
+          return "";
         });
         if (found) {
           input = newInput;
@@ -84,7 +96,7 @@ export function parse<Result = void>(
           continue main;
         }
       } else if (choice instanceof RegExp) {
-        if (['^', '$'].includes(choice.source[0]) === false) {
+        if (["^", "$"].includes(choice.source[0]) === false) {
           throw new Error(`Regex must be from start: ${choice}`);
         }
         const match = input.match(choice);
@@ -146,18 +158,22 @@ export function* hasMore() {
 
 export function has(prefix: ParseYieldable): () => ParseGenerator<boolean> {
   return function* () {
-    return (yield [prefix, '']) !== '';
+    return (yield [prefix, ""]) !== "";
   };
 }
 
-export function optional(...potentials: Array<ParseYieldable | any>): () => ParseGenerator<any> {
+export function optional(
+  ...potentials: Array<ParseYieldable | any>
+): () => ParseGenerator<any> {
   return function* () {
-    const result = yield [...potentials, ''];
-    return result === '' ? undefined : result;
+    const result = yield [...potentials, ""];
+    return result === "" ? undefined : result;
   };
 }
 
-export function lookAhead(regex: RegExp) {
+export function lookAhead(
+  regex: RegExp,
+): () => Generator<RegExp, RegExpMatchArray, RegExpMatchArray> {
   const lookAheadRegex = new RegExp(`^(?=${regex.source})`);
   return function* () {
     return yield lookAheadRegex;
@@ -170,18 +186,18 @@ export function invert<Result = void>(
   needle: {},
   iterable: ParseGenerator<Result>,
 ): string | null {
-  const result =  invertInner(needle, iterable);
-  if (result !== null && result.type === 'done') {
-    return result.components.join('');
+  const result = invertInner(needle, iterable);
+  if (result !== null && result.type === "done") {
+    return result.components.join("");
   }
 
   return null;
 }
 
 function invertInner<Result = void>(
-  needle: {},
+  needle: Record<string, string>,
   iterable: ParseGenerator<Result>,
-): { type: 'done' | 'prefix'; components: ReadonlyArray<string> } | null {
+): { type: "done" | "prefix"; components: ReadonlyArray<string> } | null {
   let reply: unknown | undefined;
 
   const expectedKeys = Object.keys(needle);
@@ -201,7 +217,7 @@ function invertInner<Result = void>(
 
       const result = next.value;
       if (result == null) {
-        return { type: 'prefix', components: Object.freeze(components) };
+        return { type: "prefix", components: Object.freeze(components) };
       }
 
       const resultKeys = new Set(Object.keys(result));
@@ -212,10 +228,12 @@ function invertInner<Result = void>(
             return false;
           }
 
-          if (typeof result[key] === 'symbol') {
+          if (typeof result[key] === "symbol") {
             const entry = regexpMap.get(result[key]);
             if (entry !== undefined) {
-              if (entry.regexp.test(needle[key])) {
+              if (
+                entry.regexp.test(needle[key])
+              ) {
                 components[entry.index] = needle[key];
                 return true;
               }
@@ -225,7 +243,7 @@ function invertInner<Result = void>(
           return result[key] === needle[key];
         })
       ) {
-        return { type: 'done', components: Object.freeze(components) };
+        return { type: "done", components: Object.freeze(components) };
       } else {
         return null;
       }
@@ -246,7 +264,7 @@ function invertInner<Result = void>(
         break; // Assume first string is the canonical version.
       } else if (choice instanceof RegExp) {
         const index = components.length;
-        components.push(''); // This will be replaced later using the index.
+        components.push(""); // This will be replaced later using the index.
         // components.push('???'); // This will be replaced later using the index.
         const s = Symbol();
         regexpMap.set(s, { regexp: choice, index });
@@ -254,8 +272,11 @@ function invertInner<Result = void>(
       } else if (choice instanceof Function) {
         const result = invertInner(needle, choice());
         if (result != null) {
-          if (result.type === 'done') {
-            return { type: 'done', components: Object.freeze(components.concat(result.components)) };
+          if (result.type === "done") {
+            return {
+              type: "done",
+              components: Object.freeze(components.concat(result.components)),
+            };
           } else {
             components.push(...result.components);
           }
@@ -264,3 +285,40 @@ function invertInner<Result = void>(
     }
   }
 }
+
+
+// type CustomFunc<T> = (p: Parser) => T;
+
+// interface MatcherFunc {
+//   (s: string): string;
+//   (r: RegExp): [string];
+//   <T>(c: CustomFunc<T>): T;
+// }
+
+// type Parser = MatcherFunc & {
+//   peek: MatcherFunc;
+//   error(description: string): void;
+// };
+
+// function Digit(this: Parser): number {
+//   const [digits] = this(/^\d+$/);
+//   const value = parseInt(digits, 10);
+
+//   if (value < 0 || value > 255) {
+//     this.error(`value must be between 0 and 255, was ${value}`);
+//   }
+
+//   return value;
+// }
+
+// function IPAddress(this: Parser): [number, number, number, number] {
+//   const first = this(Digit);
+//   this(".");
+//   const second = this(Digit);
+//   this(".");
+//   const third = this(Digit);
+//   this(".");
+//   const fourth = this(Digit);
+
+//   return [first, second, third, fourth];
+// }
