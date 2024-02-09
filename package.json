@@ -8,6 +8,7 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "browser": "./dist/yieldparser.module.js",
       "import": "./dist/yieldparser.module.js",
       "require": "./dist/yieldparser.js"
